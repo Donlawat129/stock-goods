@@ -14,6 +14,7 @@
     "@googleapis/sheets": "^11.1.0",
     "@tailwindcss/vite": "^4.1.13",
     "dotenv": "^17.2.2",
+    "lucide-react": "^0.543.0",
     "react": "^19.1.1",
     "react-dom": "^19.1.1",
     "react-icons": "^5.5.0",
