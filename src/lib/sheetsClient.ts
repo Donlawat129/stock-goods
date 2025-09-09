@@ -1,5 +1,3 @@
-// src/lib/sheetsClient.ts
-
 // ===== Env =====
 const CLIENT_ID  = import.meta.env.VITE_GOOGLE_CLIENT_ID as string;
 const SHEET_ID   = import.meta.env.VITE_SHEET_ID as string;
@@ -15,8 +13,16 @@ function assertToken() {
 }
 
 // 1) ขอ OAuth token แบบ popup (Google Identity Services)
+//    ✅ เพิ่มการเช็ค + เก็บ token ใน localStorage
 export function requestSheetsToken(): Promise<string> {
   return new Promise((resolve, reject) => {
+    // --- ถ้ามี token ใน localStorage แล้ว ใช้ได้เลย ---
+    if (!accessToken) {
+      accessToken = localStorage.getItem("sheets_token");
+    }
+    if (accessToken) return resolve(accessToken);
+
+    // --- ถ้าไม่มี ต้องขอใหม่จาก Google ---
     const g = (window as any).google;
     if (!g?.accounts?.oauth2) return reject(new Error("GSI not loaded"));
 
@@ -27,6 +33,8 @@ export function requestSheetsToken(): Promise<string> {
         const token = resp?.access_token as string | undefined;
         if (token) {
           accessToken = token;
+          // ✅ เก็บลง localStorage เพื่อใช้ครั้งต่อไป
+          localStorage.setItem("sheets_token", token);
           resolve(token);
         } else {
           reject(new Error("No access token"));
@@ -36,6 +44,12 @@ export function requestSheetsToken(): Promise<string> {
 
     tokenClient.requestAccessToken();
   });
+}
+
+// ✅ ฟังก์ชัน logout (ล้าง token ทั้งหมด)
+export function clearSheetsToken() {
+  accessToken = null;
+  localStorage.removeItem("sheets_token");
 }
 
 // 2) ฟังก์ชันอ่านช่วงข้อมูลทั่วไป
