@@ -16,6 +16,7 @@ import Objects from "./components/FrontEnd/Objects"
 
 // Dashboard pages
 import Dashboard from "./components/pages/Dashboard/Dashboard";
+import ProductManagement from "./components/pages/Dashboard/ProductManagement";
 
 export default function App() {
   return (
@@ -38,6 +39,9 @@ export default function App() {
           <Route index element={<Dashboard />} />
           {/* <Route path="repair" element={<Repair />} /> */}
         </Route>
+
+        <Route path="/ProductManagement" element={<ProductManagement />} />
+
       </Routes>
     </BrowserRouter>
   );
