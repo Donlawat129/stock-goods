@@ -22,3 +22,14 @@ dist-ssr
 *.njsproj
 *.sln
 *.sw?
+
+# node
+node_modules
+dist
+build
+
+# env
+.env
+
+# Google Service Account Keys
+server/keys/*.json
