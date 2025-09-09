@@ -1,6 +1,6 @@
 // src/components/dashboard/Dashboard.tsx
 import type { JSX } from "react";
-import { useEffect, useState } from "react";
+import { useMemo, useState } from "react";
 import {
   FiSearch, FiChevronDown, FiBell, FiShoppingCart, FiDollarSign, FiUsers, FiBox,
   FiTrendingUp, FiPieChart, FiMap, FiTarget,
@@ -23,7 +23,7 @@ type ShowcaseProduct = {
   color: string; // tailwind bg color class
 };
 
-// สินค้าที่มาจากชีต (ใช้กับ CRUD)
+// ถ้าต้องการผูกกับชีต ทีหลังค่อยคำนวณจาก items ได้
 export interface ProductItem {
   rowNumber: number;
   id: string;
@@ -35,42 +35,44 @@ export interface ProductItem {
 
 const months = ["J","F","M","A","M","J","J","A","S","O","N","D"] as const;
 
+// ===== utils =====
+const clamp01 = (v: number) => Math.max(0, Math.min(1, v));
+const toPercent = (v: number) => `${Math.round(clamp01(v) * 100)}%`;
+const CIRC = 2 * Math.PI * 40; // r=40 -> 251.2
+
 export default function DashboardContent() {
-  // ====== เชื่อมชีต + จัดการสินค้า (จากโค้ด 1)
-
-
-
-  // ====== ข้อมูลสถิติ/กราฟ (จากโค้ด 2; ไม่กระทบ CRUD)
+  // --- สลับช่วงกราฟ ---
   const [activeTab, setActiveTab] = useState<"daily" | "weekly" | "monthly">("daily");
 
+  // --- การ์ดสถิติ ---
   const stats: Stat[] = [
     { title: "Today's Sales", value: "$1,892", change: "+1.5% from yesterday", textColor: "text-blue-600", bgColor: "bg-blue-100", icon: <FiDollarSign className="text-blue-600" /> },
-    { title: "Total Orders", value: "300", change: "+5% from yesterday", textColor: "text-purple-600", bgColor: "bg-purple-100", icon: <FiShoppingCart className="text-purple-600" /> },
-    { title: "Products Sold", value: "512", change: "+12% from yesterday", textColor: "text-green-600", bgColor: "bg-green-100", icon: <FiBox className="text-green-600" /> },
-    { title: "New Customers", value: "86", change: "+8% from yesterday", textColor: "text-amber-600", bgColor: "bg-amber-100", icon: <FiUsers className="text-amber-600" /> },
+    { title: "Total Orders", value: "300",   change: "+5% from yesterday",     textColor: "text-purple-600", bgColor: "bg-purple-100", icon: <FiShoppingCart className="text-purple-600" /> },
+    { title: "Products Sold", value: "512",  change: "+12% from yesterday",    textColor: "text-green-600",  bgColor: "bg-green-100",  icon: <FiBox className="text-green-600" /> },
+    { title: "New Customers", value: "86",   change: "+8% from yesterday",     textColor: "text-amber-600",  bgColor: "bg-amber-100",  icon: <FiUsers className="text-amber-600" /> },
   ];
 
   const products: ShowcaseProduct[] = [
-    { name: "Home Decor Range", popularity: 85, sales: "45%", color: "bg-blue-500" },
+    { name: "Home Decor Range",    popularity: 85, sales: "45%", color: "bg-blue-500" },
     { name: "Disney Princess Bag", popularity: 60, sales: "20%", color: "bg-purple-500" },
     { name: "Bathroom Essentials", popularity: 75, sales: "35%", color: "bg-green-500" },
-    { name: "Apple Smartwatches", popularity: 50, sales: "25%", color: "bg-amber-500" },
+    { name: "Apple Smartwatches",  popularity: 50, sales: "25%", color: "bg-amber-500" },
   ];
 
-  // mock data
-  const visitorData: number[] = [65, 59, 80, 81, 56, 55, 40, 58, 75, 82, 90, 95];
-  const revenueData: number[] = [1200, 1900, 1500, 2100, 1800, 2500, 2200, 2800, 3200, 3500, 3800, 4200];
+  // mock graph data
+  const visitorData = [65, 59, 80, 81, 56, 55, 40, 58, 75, 82, 90, 95];
+  const revenueData = [1200, 1900, 1500, 2100, 1800, 2500, 2200, 2800, 3200, 3500, 3800, 4200];
   const targetPercent = 98;
 
-  useEffect(() => { /* โหลดหลังเชื่อมแล้วเท่านั้น */ }, []);
+  // scale กราฟเป็นเปอร์เซ็นต์จริง
+  const visitorMax = Math.max(...visitorData, 100);
+  const revenueMax = Math.max(...revenueData);
+  const visitorPct = useMemo(() => visitorData.map(v => v / visitorMax), [visitorData, visitorMax]);
+  const revenuePct = useMemo(() => revenueData.map(v => v / revenueMax), [revenueData, revenueMax]);
 
   return (
     <div className="flex-1 p-6 space-y-6 bg-gradient-to-br from-gray-50 to-blue-50 min-h-screen">
-
-      
-
-      {/* ====== ส่วน Dashboard UI (จากโค้ด 2) ====== */}
-      {/* Top Header */}
+      {/* Header */}
       <div className="flex flex-col items-start justify-between space-y-4 md:flex-row md:items-center">
         <div>
           <h1 className="text-3xl font-bold text-gray-800">Dashboard</h1>
@@ -91,9 +93,7 @@ export default function DashboardContent() {
           </div>
           <div className="relative p-2 rounded-lg bg-white border border-gray-200 cursor-pointer">
             <FiBell className="text-gray-600" />
-            <span className="absolute -top-1 -right-1 bg-red-500 text-white text-xs rounded-full h-4 w-4 flex items-center justify-center">
-              3
-            </span>
+            <span className="absolute -top-1 -right-1 bg-red-500 text-white text-xs rounded-full h-4 w-4 flex items-center justify-center">3</span>
           </div>
           <div className="flex items-center space-x-2">
             <img
@@ -109,7 +109,7 @@ export default function DashboardContent() {
         </div>
       </div>
 
-      {/* Stats Cards */}
+      {/* Stats */}
       <div className="grid grid-cols-1 gap-6 md:grid-cols-2 lg:grid-cols-4">
         {stats.map((stat, idx) => (
           <div key={idx} className="p-6 bg-white rounded-xl shadow-sm hover:shadow-md transition-all duration-300 border border-gray-100">
@@ -123,7 +123,7 @@ export default function DashboardContent() {
         ))}
       </div>
 
-      {/* Graphs Section */}
+      {/* Charts */}
       <div className="grid grid-cols-1 gap-6 lg:grid-cols-2 xl:grid-cols-3">
         {/* Visitor Insights */}
         <div className="p-6 bg-white rounded-xl shadow-sm border border-gray-100">
@@ -142,10 +142,10 @@ export default function DashboardContent() {
             </select>
           </div>
           <div className="h-48 flex items-end space-x-1 pt-4">
-            {visitorData.map((value, index) => (
-              <div key={index} className="flex-1 flex flex-col items-center">
-                <div className="w-full bg-gradient-to-t from-blue-400 to-blue-600 rounded-t-lg" style={{ height: `${value}%` }} />
-                <span className="text-xs text-gray-500 mt-1">{months[index]}</span>
+            {visitorPct.map((p, i) => (
+              <div key={i} className="flex-1 flex flex-col items-center">
+                <div className="w-full bg-gradient-to-t from-blue-400 to-blue-600 rounded-t-lg" style={{ height: toPercent(p) }} />
+                <span className="text-xs text-gray-500 mt-1">{months[i]}</span>
               </div>
             ))}
           </div>
@@ -160,10 +160,10 @@ export default function DashboardContent() {
             <span className="text-xs bg-green-100 text-green-800 px-2 py-1 rounded-full">+12.5%</span>
           </div>
           <div className="h-48 flex items-end space-x-1 pt-4">
-            {revenueData.map((value, index) => (
-              <div key={index} className="flex-1 flex flex-col items-center">
-                <div className="w-full bg-gradient-to-t from-green-400 to-green-600 rounded-t-lg" style={{ height: `${value / 50}%` }} />
-                <span className="text-xs text-gray-500 mt-1">{months[index]}</span>
+            {revenuePct.map((p, i) => (
+              <div key={i} className="flex-1 flex flex-col items-center">
+                <div className="w-full bg-gradient-to-t from-green-400 to-green-600 rounded-t-lg" style={{ height: toPercent(p) }} />
+                <span className="text-xs text-gray-500 mt-1">{months[i]}</span>
               </div>
             ))}
           </div>
@@ -192,8 +192,8 @@ export default function DashboardContent() {
                   cy={50}
                   r={40}
                   fill="transparent"
-                  strokeDasharray={251.2}
-                  strokeDashoffset={Math.max(0, 251.2 - (251.2 * targetPercent) / 100)}
+                  strokeDasharray={CIRC}
+                  strokeDashoffset={Math.max(0, CIRC - (CIRC * targetPercent) / 100)}
                 />
               </svg>
             </div>
@@ -203,24 +203,24 @@ export default function DashboardContent() {
 
       {/* Bottom Section */}
       <div className="grid grid-cols-1 gap-6 lg:grid-cols-2 xl:grid-cols-3">
-        {/* Top Products (showcase) */}
+        {/* Top Products */}
         <div className="p-6 bg-white rounded-xl shadow-sm border border-gray-100">
           <h3 className="mb-4 font-semibold text-gray-800 flex items-center">
             <FiPieChart className="mr-2 text-blue-500" /> Top Products
           </h3>
           <ul className="space-y-4">
-            {products.map((product, index) => (
-              <li key={index} className="flex items-center justify-between">
+            {products.map((p, i) => (
+              <li key={i} className="flex items-center justify-between">
                 <div className="flex items-center space-x-3 flex-1">
-                  <div className={`w-3 h-3 ${product.color} rounded-full`} />
+                  <div className={`w-3 h-3 ${p.color} rounded-full`} />
                   <div className="flex-1">
-                    <p className="text-sm font-medium text-gray-700">{product.name}</p>
+                    <p className="text-sm font-medium text-gray-700">{p.name}</p>
                     <div className="w-full h-2 mt-1 bg-gray-200 rounded-full">
-                      <div className={`h-2 ${product.color} rounded-full`} style={{ width: `${product.popularity}%` }} />
+                      <div className={`h-2 ${p.color} rounded-full`} style={{ width: `${p.popularity}%` }} />
                     </div>
                   </div>
                 </div>
-                <span className="text-sm font-medium text-gray-600">{product.sales}</span>
+                <span className="text-sm font-medium text-gray-600">{p.sales}</span>
               </li>
             ))}
           </ul>
@@ -238,7 +238,7 @@ export default function DashboardContent() {
             <div className="grid grid-cols-2 gap-4 z-10">
               {[
                 { c: "USA", v: "$42.5k" },
-                { c: "UK", v: "$28.3k" },
+                { c: "UK",  v: "$28.3k" },
                 { c: "GER", v: "$35.4k" },
                 { c: "JPN", v: "$22.7k" },
               ].map((x) => (

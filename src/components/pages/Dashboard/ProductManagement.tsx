@@ -20,7 +20,8 @@ export interface ProductItem {
   id: string;          // A
   imageUrl: string;    // B
   name: string;        // C
-  category: Category;  // D
+  // ใช้ string เพื่อให้รับค่าที่มาจากชีตได้ทุกกรณี (กัน header/พิมพ์ผิด)
+  category: string;    // D
   description: string; // E
   price: string;       // F
 }
@@ -57,6 +58,7 @@ export default function ProductManagement() {
       setConnected(true);
       await refresh();
     } catch (err: unknown) {
+      console.error("connect error:", err);
       alert((err as any)?.message ?? "เชื่อม Google Sheets ไม่สำเร็จ");
     }
   };
@@ -65,8 +67,19 @@ export default function ProductManagement() {
     setLoading(true);
     try {
       const { items } = await getProducts();
-      setItems(items as ProductItem[]);
+      // ป้องกันคอลัมน์ไม่ครบ -> fill เป็นสตริงว่าง
+      const normalized = (items as any[]).map((r, i) => ({
+        rowNumber: r.rowNumber ?? i + 2,
+        id: r.id ?? "",
+        imageUrl: r.imageUrl ?? "",
+        name: r.name ?? "",
+        category: r.category ?? "",       // << สำคัญ
+        description: r.description ?? "",
+        price: r.price ?? "",
+      })) as ProductItem[];
+      setItems(normalized);
     } catch (err: unknown) {
+      console.error("refresh error:", err);
       alert((err as any)?.message ?? "โหลดข้อมูลไม่สำเร็จ");
     } finally {
       setLoading(false);
@@ -79,16 +92,27 @@ export default function ProductManagement() {
     if (!form.category) return alert("เลือก Category");
     setLoading(true);
     try {
-      const payload = { ...form, price: String(form.price) };
+      // ✅ ประกอบ payload ให้เรียงและมี category แน่นอน
+      const payload = {
+        id: String(form.id).trim(),
+        imageUrl: String(form.imageUrl).trim(),
+        name: String(form.name).trim(),
+        category: String(form.category).trim(),      // << ส่งแน่ ๆ
+        description: String(form.description).trim(),
+        price: String(form.price).trim(),
+      };
+
       if (isEditing && editingRow !== null) {
         await updateProductRow(editingRow, payload);
       } else {
         await addProduct(payload);
       }
+
       setForm(initForm);
       setEditingRow(null);
       await refresh();
     } catch (err: unknown) {
+      console.error("submit error:", err);
       alert((err as any)?.message ?? "บันทึกไม่สำเร็จ");
     } finally {
       setLoading(false);
@@ -98,12 +122,13 @@ export default function ProductManagement() {
   const onEdit = (rowNumber: number, item: ProductItem) => {
     setEditingRow(rowNumber);
     setForm({
-      id: item.id,
-      imageUrl: item.imageUrl,
-      name: item.name,
-      category: item.category,
-      description: item.description,
-      price: item.price,
+      id: item.id ?? "",
+      imageUrl: item.imageUrl ?? "",
+      name: item.name ?? "",
+      // cast ถ้าค่า category จากชีตไม่ตรงกับสามตัวเลือก จะเซตเป็น "" เพื่อให้เลือกใหม่
+      category: (CATEGORIES as string[]).includes(item.category) ? (item.category as Category) : "",
+      description: item.description ?? "",
+      price: item.price ?? "",
     });
     window.scrollTo({ top: 0, behavior: "smooth" });
   };
@@ -115,6 +140,7 @@ export default function ProductManagement() {
       await deleteProductRow(rowNumber);
       await refresh();
     } catch (err: unknown) {
+      console.error("delete error:", err);
       alert((err as any)?.message ?? "ลบไม่สำเร็จ");
     } finally {
       setLoading(false);

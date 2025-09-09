@@ -1,7 +1,9 @@
+// lib/sheetsClient.ts
+
 // ===== Env =====
 const CLIENT_ID  = import.meta.env.VITE_GOOGLE_CLIENT_ID as string;
 const SHEET_ID   = import.meta.env.VITE_SHEET_ID as string;
-const SHEET_TAB  = (import.meta.env.VITE_SHEET_TAB as string) || "Users";     // สำหรับ Users
+const SHEET_TAB  = (import.meta.env.VITE_SHEET_TAB as string) || "Users"; // สำหรับ Users
 const DEFAULT_TAB = SHEET_TAB;
 
 // ===== OAuth token (ต้องอยู่ก่อนใช้งานทุกฟังก์ชัน) =====
@@ -98,22 +100,25 @@ export async function findUserByEmailPassword(email: string, password: string) {
   return null;
 }
 
-// ====== ส่วน Products (ที่หน้า Dashboard ใช้) ======
+// ====== ส่วน Products (ที่หน้า ProductManagement ใช้) ======
 const TAB_PRODUCTS = (import.meta.env.VITE_SHEET_TAB_PRODUCTS as string) || "Products";
 
 export type ProductRow = {
-  rowNumber: number; // ใช้ชี้แถวเวลาแก้ไข/ลบ
-  id: string;
-  imageUrl: string;
-  name: string;
-  description: string;
-  price: string;
+  rowNumber: number;   // ใช้ชี้แถวเวลาแก้ไข/ลบ (1-based ในชีต)
+  id: string;          // A
+  imageUrl: string;    // B
+  name: string;        // C
+  category: string;    // D   << เพิ่ม
+  description: string; // E
+  price: string;       // F
 };
 
-// อ่านสินค้าทั้งหมด
-export async function getProducts(tab = TAB_PRODUCTS): Promise<{ header: string[]; items: ProductRow[] }> {
+// อ่านสินค้าทั้งหมด (A..F)
+export async function getProducts(
+  tab = TAB_PRODUCTS
+): Promise<{ header: string[]; items: ProductRow[] }> {
   const token = assertToken();
-  const range = `${tab}!A1:E`;
+  const range = `${tab}!A1:F`; // << ขยายถึง F รวม category
   const url = `https://sheets.googleapis.com/v4/spreadsheets/${SHEET_ID}/values/${encodeURIComponent(range)}`;
   const res = await fetch(url, { headers: { Authorization: `Bearer ${token}` } });
   if (!res.ok) throw new Error(await res.text());
@@ -124,27 +129,44 @@ export async function getProducts(tab = TAB_PRODUCTS): Promise<{ header: string[
 
   const items: ProductRow[] = rows
     .map((r, i) => ({
-      rowNumber: i + 2, // แถวจริงเริ่มที่ 2
+      rowNumber: i + 2,          // แถวจริงเริ่มที่ 2 (เพราะแถว 1 คือ header)
       id: r[0] ?? "",
       imageUrl: r[1] ?? "",
       name: r[2] ?? "",
-      description: r[3] ?? "",
-      price: r[4] ?? "",
+      category: r[3] ?? "",      // << map คอลัมน์ D
+      description: r[4] ?? "",
+      price: r[5] ?? "",
     }))
     .filter((x) => x.id);
 
   return { header, items };
 }
 
-// เพิ่มสินค้า (append แถวใหม่)
+// เพิ่มสินค้า (append แถวใหม่)  A..F = id,imageUrl,name,category,description,price
 export async function addProduct(
-  p: { id: string; imageUrl: string; name: string; description: string; price: string | number },
+  p: {
+    id: string;
+    imageUrl: string;
+    name: string;
+    category: string;         // << ต้องมี
+    description: string;
+    price: string | number;
+  },
   tab = TAB_PRODUCTS
 ) {
   const token = assertToken();
   const url =
     `https://sheets.googleapis.com/v4/spreadsheets/${SHEET_ID}/values/${encodeURIComponent(tab)}!A1:append?valueInputOption=USER_ENTERED`;
-  const body = { values: [[p.id, p.imageUrl, p.name, p.description, String(p.price)]] };
+  const body = {
+    values: [[
+      p.id ?? "",
+      p.imageUrl ?? "",
+      p.name ?? "",
+      p.category ?? "",        // << D
+      p.description ?? "",
+      String(p.price ?? ""),
+    ]],
+  };
   const res = await fetch(url, {
     method: "POST",
     headers: { Authorization: `Bearer ${token}`, "Content-Type": "application/json" },
@@ -154,17 +176,33 @@ export async function addProduct(
   return res.json();
 }
 
-// อัปเดตสินค้า (โดยใช้ rowNumber)
+// อัปเดตสินค้า (โดยใช้ rowNumber)  A..F
 export async function updateProduct(
   rowNumber: number,
-  p: { id: string; imageUrl: string; name: string; description: string; price: string | number },
+  p: {
+    id: string;
+    imageUrl: string;
+    name: string;
+    category: string;         // << ต้องมี
+    description: string;
+    price: string | number;
+  },
   tab = TAB_PRODUCTS
 ) {
   const token = assertToken();
-  const range = `${tab}!A${rowNumber}:E${rowNumber}`;
+  const range = `${tab}!A${rowNumber}:F${rowNumber}`; // << ถึง F
   const url =
     `https://sheets.googleapis.com/v4/spreadsheets/${SHEET_ID}/values/${encodeURIComponent(range)}?valueInputOption=USER_ENTERED`;
-  const body = { values: [[p.id, p.imageUrl, p.name, p.description, String(p.price)]] };
+  const body = {
+    values: [[
+      p.id ?? "",
+      p.imageUrl ?? "",
+      p.name ?? "",
+      p.category ?? "",        // << D
+      p.description ?? "",
+      String(p.price ?? ""),
+    ]],
+  };
   const res = await fetch(url, {
     method: "PUT",
     headers: { Authorization: `Bearer ${token}`, "Content-Type": "application/json" },
@@ -174,10 +212,10 @@ export async function updateProduct(
   return res.json();
 }
 
-// ลบสินค้า (ล้างค่าแถว)
+// ลบสินค้า (ล้างค่าแถว) A..F
 export async function deleteProduct(rowNumber: number, tab = TAB_PRODUCTS) {
   const token = assertToken();
-  const range = `${tab}!A${rowNumber}:E${rowNumber}`;
+  const range = `${tab}!A${rowNumber}:F${rowNumber}`; // << ถึง F
   const url = `https://sheets.googleapis.com/v4/spreadsheets/${SHEET_ID}/values/${encodeURIComponent(range)}:clear`;
   const res = await fetch(url, {
     method: "POST",
@@ -188,6 +226,6 @@ export async function deleteProduct(rowNumber: number, tab = TAB_PRODUCTS) {
   return res.json();
 }
 
-// ----- ชื่อ alias ให้ตรงกับหน้า Dashboard.tsx -----
+// ----- ชื่อ alias ให้ตรงกับหน้า ProductManagement.tsx -----
 export const updateProductRow = updateProduct;
 export const deleteProductRow = deleteProduct;
