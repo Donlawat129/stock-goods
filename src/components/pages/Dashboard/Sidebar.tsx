@@ -5,8 +5,6 @@ import {
   FaShoppingCart,
   FaBox,
   FaChartLine,
-  FaEnvelope,
-  FaCog,
   FaSignOutAlt,
   FaChevronRight,
   FaTimes,
@@ -23,12 +21,10 @@ const Sidebar = () => {
   // กำหนดเส้นทางของแต่ละเมนูให้ตรงกับ Router ของโปรเจค
   const navItems = [
     { icon: <FaTachometerAlt />, text: "Dashboard",   to: "/" },
-    { icon: <FaStar />,          text: "Leaderboard", to: "/leaderboard" },
+    { icon: <FaStar />,          text: "Product Management", to: "/ProductManagement" },
     { icon: <FaShoppingCart />,  text: "Order",       to: "/orders" },
     { icon: <FaBox />,           text: "Products",    to: "/products" },
     { icon: <FaChartLine />,     text: "Sales Report",to: "/sales" },
-    { icon: <FaEnvelope />,      text: "Messages",    to: "/messages", badge: 3 },
-    { icon: <FaCog />,           text: "Settings",    to: "/settings" },
     { icon: <FaSignOutAlt />,    text: "Sign Out",    to: "/signout" },
   ];
 
@@ -105,16 +101,6 @@ const Sidebar = () => {
                   <div className="absolute left-0 w-1 h-8 bg-white rounded-r-full" />
                 )}
 
-                {/* Icon + Badge */}
-                <div className={`${isCollapsed ? "" : "mr-3"} relative`}>
-                  <div className="text-lg">{item.icon}</div>
-                  {item.badge ? (
-                    <span className="absolute -top-2 -right-2 bg-red-500 text-white text-xs rounded-full h-5 w-5 grid place-items-center">
-                      {item.badge}
-                    </span>
-                  ) : null}
-                </div>
-
                 {/* Label + Chevron (เฉพาะตอนไม่ย่อ) */}
                 {!isCollapsed && (
                   <>
@@ -126,16 +112,7 @@ const Sidebar = () => {
                 )}
 
                 {/* Tooltip ตอนย่อ */}
-                {isCollapsed && (
-                  <div className="absolute left-full ml-3 px-2 py-1 bg-gray-900 text-white text-sm rounded-md opacity-0 group-hover:opacity-100 transition-opacity duration-200 whitespace-nowrap">
-                    {item.text}
-                    {item.badge ? (
-                      <span className="ml-1 bg-red-500 text-white text-xs rounded-full inline-flex items-center justify-center h-4 w-4">
-                        {item.badge}
-                      </span>
-                    ) : null}
-                  </div>
-                )}
+                
               </NavLink>
             ))}
           </nav>
