@@ -3,7 +3,7 @@ import { Link, NavLink } from "react-router-dom";  // << เพิ่ม Link �
 
 const Navbar: React.FC = () => {
   return (
-    <header className="bg-[#f0e9e2] px-8 py-4">
+    <header className="bg-[#cedff3] px-8 py-4">
       <div className="container mx-auto flex justify-between items-center">
         {/* Logo */}
         <Link to="/" className="text-xl tracking-[0.25em]">ShirtHub</Link>
