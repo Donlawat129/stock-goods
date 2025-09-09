@@ -62,7 +62,7 @@ const DashboardContent = () => {
   // Mock data for charts
   const visitorData = [65, 59, 80, 81, 56, 55, 40, 58, 75, 82, 90, 95];
   const revenueData = [1200, 1900, 1500, 2100, 1800, 2500, 2200, 2800, 3200, 3500, 3800, 4200];
-  const targetData = [80, 85, 75, 90, 95, 87, 92, 98, 100, 95, 97, 99];
+
 
   return (
     <div className="flex-1 p-6 space-y-6 bg-gradient-to-br from-gray-50 to-blue-50 min-h-screen">

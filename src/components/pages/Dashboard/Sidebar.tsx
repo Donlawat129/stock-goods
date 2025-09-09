@@ -1,12 +1,8 @@
 // src/components/Sidebar.jsx
 import {
   FaTachometerAlt,
-  FaStar,
   FaShoppingCart,
   FaBox,
-  FaChartLine,
-  FaEnvelope,
-  FaCog,
   FaSignOutAlt,
   FaChevronRight,
   FaTimes,
@@ -21,12 +17,8 @@ const Sidebar = () => {
 
   const navItems = [
     { icon: <FaTachometerAlt />, text: "Dashboard" },
-    { icon: <FaStar />, text: "Leaderboard" },
     { icon: <FaShoppingCart />, text: "Order" },
     { icon: <FaBox />, text: "Products" },
-    { icon: <FaChartLine />, text: "Sales Report" },
-    { icon: <FaEnvelope />, text: "Messages", badge: 3 },
-    { icon: <FaCog />, text: "Settings" },
     { icon: <FaSignOutAlt />, text: "Sign Out" },
   ];
 
@@ -103,11 +95,6 @@ const Sidebar = () => {
                   <div className={`text-lg ${activeItem === item.text ? 'text-white' : 'text-gray-500 group-hover:text-blue-600'}`}>
                     {item.icon}
                   </div>
-                  {item.badge && (
-                    <span className="absolute -top-2 -right-2 bg-red-500 text-white text-xs rounded-full h-5 w-5 flex items-center justify-center">
-                      {item.badge}
-                    </span>
-                  )}
                 </div>
                 
                 {!isCollapsed && (
@@ -123,11 +110,6 @@ const Sidebar = () => {
                 {isCollapsed && (
                   <div className="absolute left-full ml-3 px-2 py-1 bg-gray-900 text-white text-sm rounded-md opacity-0 group-hover:opacity-100 transition-opacity duration-200 whitespace-nowrap">
                     {item.text}
-                    {item.badge && (
-                      <span className="ml-1 bg-red-500 text-white text-xs rounded-full h-4 w-4 flex items-center justify-center ">
-                        {item.badge}
-                      </span>
-                    )}
                   </div>
                 )}
               </a>
