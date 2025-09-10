@@ -21,6 +21,8 @@ import Dashboard from "./components/pages/Dashboard/Dashboard";
 import ProductManagement from "./components/pages/Dashboard/ProductManagement";
 import HeroBanner from "./components/pages/Dashboard/HeroBanner";
 
+import TestAuth from "./components/pages/TestAuth";
+
 export default function App() {
   return (
     <BrowserRouter>
@@ -52,6 +54,8 @@ export default function App() {
         <Route path="HeroBanner" element={<HeroBanner />} />
         {/* ถ้ามีหน้าอื่น เติมตรงนี้ได้ */}
       </Route>
+
+        <Route path="/test-auth" element={<TestAuth />} />
 
       {/* ไม่เจอเส้นทางใด ๆ เด้งกลับ Dashboard */}
       <Route path="*" element={<Navigate to="/Dashboard" replace />} />
