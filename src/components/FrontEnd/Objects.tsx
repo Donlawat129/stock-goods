@@ -2,23 +2,24 @@
 import ProductCard from "./ProductCard";
 import type { Product } from "./ProductCard"; 
 import { useMemo, useState } from "react";
+import CategoryProducts from "./CategoryProducts";
 
-const img = (id: number) =>
-  `https://images.unsplash.com/photo-1512436991641-6745cdb1723f?q=80&w=1200&auto=format&fit=crop&ixlib=rb-4.0.3&ixid=${id}`;
+// const img = (id: number) =>
+//   `https://images.unsplash.com/photo-1512436991641-6745cdb1723f?q=80&w=1200&auto=format&fit=crop&ixlib=rb-4.0.3&ixid=${id}`;
 
 const ALL_PRODUCTS: Product[] = [
-  { id: "o1",  name: "Geometric Tee",     color: "(Mono)",      price: 32, image: img(201), stock: 12 },
-  { id: "o2",  name: "Minimal Circle Tee",color: "(Bone)",      price: 32, image: img(202), stock: 12 },
-  { id: "o3",  name: "Lines Tee",         color: "(Graphite)",  price: 32, image: img(203), stock: 12 },
-  { id: "o4",  name: "Triangle Tee",      color: "(Rust)",      price: 32, image: img(204), stock: 12 },
-  { id: "o5",  name: "Dot Tee",           color: "(Black)",     price: 32, image: img(205), stock: 12 },
-  { id: "o6",  name: "Wave Tee",          color: "(Indigo)",    price: 32, image: img(206), stock: 12 },
-  { id: "o7",  name: "Grid Tee",          color: "(Charcoal)",  price: 32, image: img(207), stock: 12 },
-  { id: "o8",  name: "Arc Tee",           color: "(Olive)",     price: 32, image: img(208), stock: 12 },
-  { id: "o9",  name: "Blend Tee",         color: "(Sand)",      price: 32, image: img(209), stock: 12 },
-  { id: "o10", name: "Stripe Tee",        color: "(Deep Navy)", price: 32, image: img(210), stock: 12 },
-  { id: "o11", name: "Fade Tee",          color: "(Grey)",      price: 32, image: img(211), stock: 12 },
-  { id: "o12", name: "Peak Tee",          color: "(Port)",      price: 32, image: img(212), stock: 12 },
+  // { id: "o1",  name: "Geometric Tee",     color: "(Mono)",      price: 32, image: img(201), stock: 12 },
+  // { id: "o2",  name: "Minimal Circle Tee",color: "(Bone)",      price: 32, image: img(202), stock: 12 },
+  // { id: "o3",  name: "Lines Tee",         color: "(Graphite)",  price: 32, image: img(203), stock: 12 },
+  // { id: "o4",  name: "Triangle Tee",      color: "(Rust)",      price: 32, image: img(204), stock: 12 },
+  // { id: "o5",  name: "Dot Tee",           color: "(Black)",     price: 32, image: img(205), stock: 12 },
+  // { id: "o6",  name: "Wave Tee",          color: "(Indigo)",    price: 32, image: img(206), stock: 12 },
+  // { id: "o7",  name: "Grid Tee",          color: "(Charcoal)",  price: 32, image: img(207), stock: 12 },
+  // { id: "o8",  name: "Arc Tee",           color: "(Olive)",     price: 32, image: img(208), stock: 12 },
+  // { id: "o9",  name: "Blend Tee",         color: "(Sand)",      price: 32, image: img(209), stock: 12 },
+  // { id: "o10", name: "Stripe Tee",        color: "(Deep Navy)", price: 32, image: img(210), stock: 12 },
+  // { id: "o11", name: "Fade Tee",          color: "(Grey)",      price: 32, image: img(211), stock: 12 },
+  // { id: "o12", name: "Peak Tee",          color: "(Port)",      price: 32, image: img(212), stock: 12 },
 ];
 
 export default function Objects() {
@@ -28,6 +29,7 @@ export default function Objects() {
 
   return (
     <div className="container mx-auto px-4 py-10">
+      <CategoryProducts category="Objects" />;
       {/* Tabs */}
             <div className="mb-4 text-sm text-gray-600">
         Showing {products.length} products
