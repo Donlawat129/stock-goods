@@ -1,19 +1,16 @@
 // src/components/pages/Dashboard/ProductManagement.tsx
-import { useMemo, useState } from "react";
+import { useEffect, useMemo, useState } from "react";
 import {
-  FiPlus,
-  FiEdit,
-  FiTrash,
-  FiLink,
-  FiCloud,
-  FiRefreshCw,
+  FiPlus, FiEdit, FiTrash, FiLink, FiCloud, FiRefreshCw,
 } from "react-icons/fi";
 import {
   requestSheetsToken,
-  getProducts,
+  ensureToken,             // <-- เพิ่ม
   addProduct,
+  getProducts,
   updateProductRow,
   deleteProductRow,
+  getNextProductId,
 } from "../../../lib/sheetsClient";
 
 // ---------- Types ----------
@@ -22,13 +19,13 @@ const CATEGORIES: Category[] = ["Mens", "Womens", "Objects"];
 
 export interface ProductItem {
   rowNumber: number;
-  id: string;           // A
-  imageUrl: string;     // B
-  name: string;         // C
-  category: string;     // D
-  description: string;  // E
-  price: string;        // F
-  quantity: string;     // G
+  id: string;
+  imageUrl: string;
+  name: string;
+  category: string;
+  description: string;
+  price: string;
+  quantity: string;
 }
 
 interface ProductForm {
@@ -59,12 +56,34 @@ export default function ProductManagement() {
   const [loading, setLoading] = useState(false);
   const isEditing = useMemo(() => editingRow !== null, [editingRow]);
 
+  // ------- helpers -------
+  const assignNewId = async () => {
+    const next = await getNextProductId();
+    setForm((f) => ({ ...f, id: next }));
+  };
+
+  // ===== Auto connect on mount (silent) =====
+  useEffect(() => {
+    (async () => {
+      try {
+        await ensureToken();   // ถ้าเคยอนุญาตแล้วจะผ่านแบบเงียบ
+        setConnected(true);
+        await refresh();
+        await assignNewId();
+      } catch {
+        // ผู้ใช้ใหม่/ไม่มีสิทธิ์ → รอให้กดปุ่ม Connect
+      }
+    })();
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, []);
+
   // ===== Actions =====
   const connectSheets = async () => {
     try {
       await requestSheetsToken();
       setConnected(true);
       await refresh();
+      await assignNewId();            // gen เลขให้ทันที
     } catch (err: unknown) {
       console.error("connect error:", err);
       alert((err as any)?.message ?? "เชื่อม Google Sheets ไม่สำเร็จ");
@@ -96,12 +115,17 @@ export default function ProductManagement() {
 
   const onSubmit = async (e: React.FormEvent<HTMLFormElement>) => {
     e.preventDefault();
-    if (!form.id || !form.name) return alert("กรอก ID และชื่อสินค้า");
+    if (!form.name) return alert("กรอกชื่อสินค้า");
     if (!form.category) return alert("เลือก Category");
+
     setLoading(true);
     try {
+      // ถ้าเป็นการเพิ่ม และ ID ยังว่าง ให้ขอเลขถัดไปอัตโนมัติ
+      let idToUse = String(form.id || "").trim();
+      if (!isEditing && !idToUse) idToUse = await getNextProductId();
+
       const payload = {
-        id: String(form.id).trim(),
+        id: idToUse,
         imageUrl: String(form.imageUrl).trim(),
         name: String(form.name).trim(),
         category: String(form.category).trim(),
@@ -109,14 +133,17 @@ export default function ProductManagement() {
         price: String(form.price).trim(),
         quantity: String(form.quantity).trim(),
       };
+
       if (isEditing && editingRow !== null) {
         await updateProductRow(editingRow, payload);
       } else {
         await addProduct(payload);
       }
-      setForm(initForm);
+
       setEditingRow(null);
+      setForm(initForm);
       await refresh();
+      await assignNewId();            // เตรียมเลขถัดไป
     } catch (err: unknown) {
       console.error("submit error:", err);
       alert((err as any)?.message ?? "บันทึกไม่สำเร็จ");
@@ -147,6 +174,7 @@ export default function ProductManagement() {
     try {
       await deleteProductRow(rowNumber);
       await refresh();
+      if (!isEditing) await assignNewId(); // เผื่อจะเพิ่มชิ้นใหม่ต่อ
     } catch (err: unknown) {
       console.error("delete error:", err);
       alert((err as any)?.message ?? "ลบไม่สำเร็จ");
@@ -155,64 +183,68 @@ export default function ProductManagement() {
     }
   };
 
-  // ===== Reusable styles (เหมือนการ์ด Dashboard) =====
-  const card =
-    "bg-white rounded-2xl shadow-sm border border-gray-200/60";
-
+  // ===== styles =====
+  const card = "bg-white rounded-2xl shadow-sm border border-gray-200/60";
   const input =
     "w-full rounded-xl border border-gray-300/70 bg-white px-3 py-2 text-sm placeholder:text-gray-400 " +
     "focus:outline-none focus:ring-2 focus:ring-indigo-400/60 focus:border-transparent";
-
   const actionBtn =
     "inline-flex items-center gap-2 rounded-xl border border-gray-300/70 bg-white px-3 py-2 text-sm hover:bg-gray-50 transition";
-
   const primaryBtn =
-    "inline-flex items-center gap-2 rounded-xl bg-gradient-to-r from-indigo-500 to-violet-500 text-white px-4 py-2 text-sm shadow " +
+    "inline-flex items-center gap-2 rounded-2xl bg-gradient-to-r from-indigo-500 to-violet-500 text-white px-4 py-2 text-sm shadow " +
     "hover:opacity-95 disabled:opacity-50";
 
   return (
     <div className="space-y-6">
-      {/* Page header */}
+      {/* header */}
       <div className="flex flex-col md:flex-row md:items-center md:justify-between gap-3">
         <div>
           <h1 className="text-2xl font-bold text-gray-800">Product Management</h1>
-          <p className="text-gray-500 text-sm">
-            Manage products synced with Google Sheets
-          </p>
+          <p className="text-gray-500 text-sm">Manage products synced with Google Sheets</p>
         </div>
 
         <div className="flex gap-2">
-          <button
-            className={actionBtn}
-            onClick={connectSheets}
-            disabled={connected}
-            title="Connect Google Sheets"
-          >
-            <FiCloud className="text-indigo-500" />
-            {connected ? "Connected" : "Connect Google Sheets"}
-          </button>
-          <button
-            className={actionBtn}
-            onClick={refresh}
-            disabled={!connected || loading}
-            title="Refresh"
-          >
+          {!connected && (
+            <button className={actionBtn} onClick={connectSheets} disabled={connected}>
+              <FiCloud className="text-indigo-500" />
+              Connect Google Sheets
+            </button>
+          )}
+          {connected && (
+            <span className="inline-flex items-center gap-2 rounded-xl border border-green-200 bg-green-50 px-3 py-2 text-sm text-green-700">
+              <FiCloud /> Connected
+            </span>
+          )}
+          <button className={actionBtn} onClick={refresh} disabled={!connected || loading}>
             <FiRefreshCw className="text-gray-600" />
             Refresh
           </button>
         </div>
       </div>
 
-      {/* Form card */}
+      {/* form */}
       <div className={card}>
         <div className="p-5">
           <form onSubmit={onSubmit} className="grid grid-cols-1 md:grid-cols-7 gap-3">
-            <input
-              className={input}
-              placeholder="Product ID"
-              value={form.id}
-              onChange={(e) => setForm({ ...form, id: e.target.value })}
-            />
+            {/* Product ID: readOnly + ปุ่ม New ใช้เลขถัดไปจากชีต */}
+            <div className="flex gap-2">
+              <input
+                className={input + " flex-1"}
+                placeholder="Product ID (auto)"
+                value={form.id}
+                readOnly
+                title="ระบบจะกำหนดเลขให้อัตโนมัติ"
+              />
+              <button
+                type="button"
+                className={actionBtn}
+                onClick={assignNewId}
+                title="ใช้เลขถัดไป"
+                disabled={!connected || loading}
+              >
+                <FiRefreshCw /> New
+              </button>
+            </div>
 
             <div className="md:col-span-2 flex gap-2">
               <input
@@ -239,20 +271,13 @@ export default function ProductManagement() {
               onChange={(e) => setForm({ ...form, name: e.target.value })}
             />
 
-            {/* Category */}
             <select
               className={input}
               value={form.category}
               onChange={(e) => setForm({ ...form, category: e.target.value as Category })}
             >
-              <option value="" disabled>
-                Category
-              </option>
-              {CATEGORIES.map((c) => (
-                <option key={c} value={c}>
-                  {c}
-                </option>
-              ))}
+              <option value="" disabled>Category</option>
+              {CATEGORIES.map((c) => (<option key={c} value={c}>{c}</option>))}
             </select>
 
             <input
@@ -270,7 +295,6 @@ export default function ProductManagement() {
               inputMode="numeric"
             />
 
-            {/* Description → textarea */}
             <textarea
               className={input + " md:col-span-7 resize-y"}
               placeholder="Description"
@@ -280,29 +304,18 @@ export default function ProductManagement() {
             />
 
             <div className="md:col-span-7 flex gap-2 pt-1">
-              <button
-                className={primaryBtn}
-                type="submit"
-                disabled={!connected || loading}
-              >
-                {isEditing ? (
-                  <>
-                    <FiEdit /> Update
-                  </>
-                ) : (
-                  <>
-                    <FiPlus /> Add
-                  </>
-                )}
+              <button className={primaryBtn} type="submit" disabled={!connected || loading}>
+                {isEditing ? (<><FiEdit /> Update</>) : (<><FiPlus /> Add</>)}
               </button>
 
               {isEditing && (
                 <button
                   type="button"
                   className={actionBtn}
-                  onClick={() => {
+                  onClick={async () => {
                     setEditingRow(null);
                     setForm(initForm);
+                    await assignNewId();   // ออกโหมดแก้ไข → เตรียมเลขใหม่
                   }}
                 >
                   Cancel
@@ -313,7 +326,7 @@ export default function ProductManagement() {
         </div>
       </div>
 
-      {/* Table card */}
+      {/* table */}
       <div className={card}>
         <div className="p-5">
           <div className="overflow-x-auto">
@@ -334,37 +347,20 @@ export default function ProductManagement() {
                     <td className="py-2 pr-4 font-mono">{it.id}</td>
                     <td className="py-2 pr-4">
                       {it.imageUrl ? (
-                        <img
-                          src={it.imageUrl}
-                          alt={it.name}
-                          className="h-10 w-10 object-cover rounded-md ring-1 ring-gray-200"
-                        />
-                      ) : (
-                        "-"
-                      )}
+                        <img src={it.imageUrl} alt={it.name} className="h-10 w-10 object-cover rounded-md ring-1 ring-gray-200" />
+                      ) : "-"}
                     </td>
                     <td className="py-2 pr-4">{it.name}</td>
                     <td className="py-2 pr-4">{it.category}</td>
-                    <td
-                      className="py-2 pr-4 max-w-[480px] truncate"
-                      title={it.description}
-                    >
-                      {it.description}
-                    </td>
+                    <td className="py-2 pr-4 max-w-[480px] truncate" title={it.description}>{it.description}</td>
                     <td className="py-2 pr-4">{it.price}</td>
                     <td className="py-2 pr-4">{it.quantity}</td>
                     <td className="py-2 pr-4">
                       <div className="flex gap-2">
-                        <button
-                          className={actionBtn}
-                          onClick={() => onEdit(it.rowNumber, it)}
-                        >
+                        <button className={actionBtn} onClick={() => onEdit(it.rowNumber, it)}>
                           <FiEdit /> Edit
                         </button>
-                        <button
-                          className={actionBtn + " text-red-600 hover:bg-red-50"}
-                          onClick={() => onDelete(it.rowNumber)}
-                        >
+                        <button className={actionBtn + " text-red-600 hover:bg-red-50"} onClick={() => onDelete(it.rowNumber)}>
                           <FiTrash /> Delete
                         </button>
                       </div>
@@ -373,9 +369,7 @@ export default function ProductManagement() {
                 ))}
                 {items.length === 0 && (
                   <tr>
-                    <td className="py-4 text-gray-500" colSpan={8}>
-                      ไม่มีข้อมูล
-                    </td>
+                    <td className="py-4 text-gray-500" colSpan={8}>ไม่มีข้อมูล</td>
                   </tr>
                 )}
               </tbody>

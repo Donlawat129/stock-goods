@@ -30,7 +30,7 @@ const Sidebar = () => {
 
   const navItems: { icon: ReactNode; text: string; to: string }[] = [
     { icon: <FaTachometerAlt />, text: "Dashboard",          to: "/Dashboard" },
-    { icon: <FaChevronRight />,           text: "Hero Banner", to: "/Dashboard/HeroBanner" },
+    { icon: <FaChevronRight />,  text: "Hero Banner", to: "/Dashboard/HeroBanner" },
     { icon: <FaBox />,           text: "Product Management", to: "/Dashboard/ProductManagement" },
   ];
 
