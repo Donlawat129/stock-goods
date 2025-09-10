@@ -3,7 +3,7 @@ import type { JSX } from "react";
 import { useEffect, useMemo, useState } from "react";
 import {
   FiShoppingCart, FiDollarSign, FiUsers, FiBox,
-  FiTrendingUp, FiPieChart, FiMap, FiTarget,
+  FiTrendingUp, FiPieChart, FiTarget,
 } from "react-icons/fi";
 
 // เชื่อม Google Sheets

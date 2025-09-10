@@ -1,29 +1,29 @@
 // src/components/Sidebar.jsx
+import { useState } from "react";
+import { NavLink } from "react-router-dom";
 import {
   FaTachometerAlt,
-  FaStar,
+  FaBox,
   FaSignOutAlt,
   FaChevronRight,
   FaTimes,
-  FaBars
+  FaBars,
 } from "react-icons/fa";
-import { useState } from "react";
-import { NavLink, useLocation } from "react-router-dom";
 
 const Sidebar = () => {
   const [isCollapsed, setIsCollapsed] = useState(false);
   const [isMobileOpen, setIsMobileOpen] = useState(false);
-  const location = useLocation();
 
-  // กำหนดเส้นทางของแต่ละเมนูให้ตรงกับ Router ของโปรเจค
+  // แก้ path ให้ตรงกับ route ของโปรเจกต์คุณได้ตามต้องการ
   const navItems = [
-    { icon: <FaTachometerAlt />, text: "Dashboard",   to: "/" },
-    { icon: <FaStar />,          text: "Product Management", to: "/ProductManagement" },
-    { icon: <FaSignOutAlt />,    text: "Sign Out",    to: "/signout" },
+    { icon: <FaTachometerAlt />, text: "Dashboard",           to: "/Dashboard" },
+    { icon: <FaBox />,           text: "Product Management",  to: "/Dashboard/ProductManagement" },
+    { icon: <FaSignOutAlt />,    text: "Sign Out",            to: "/logout" }, // หรือหน้า login ของคุณ
   ];
 
   const toggleSidebar = () => setIsCollapsed((v) => !v);
   const toggleMobileSidebar = () => setIsMobileOpen((v) => !v);
+  const closeMobile = () => setIsMobileOpen(false);
 
   return (
     <>
@@ -39,7 +39,7 @@ const Sidebar = () => {
       {isMobileOpen && (
         <div
           className="fixed inset-0 bg-black bg-opacity-50 z-40 lg:hidden"
-          onClick={() => setIsMobileOpen(false)}
+          onClick={closeMobile}
         />
       )}
 
@@ -79,34 +79,48 @@ const Sidebar = () => {
               <NavLink
                 key={index}
                 to={item.to}
-                onClick={() => setIsMobileOpen(false)}
+                end
+                onClick={closeMobile}
                 className={({ isActive }) =>
-                  [
-                    "flex items-center p-3 rounded-xl transition-all duration-200 group relative overflow-hidden",
+                  `flex items-center p-3 rounded-xl transition-all duration-200 group relative overflow-hidden ${
                     isActive
                       ? "bg-gradient-to-r from-blue-600 to-purple-600 text-white shadow-lg"
-                      : "text-gray-600 hover:bg-blue-100 hover:text-blue-600",
-                    isCollapsed ? "justify-center" : ""
-                  ].join(" ")
+                      : "text-gray-600 hover:bg-blue-100 hover:text-blue-600"
+                  } ${isCollapsed ? "justify-center" : ""}`
                 }
               >
-                {/* แถบซ้ายตอน active */}
-                {location.pathname === item.to && !isCollapsed && (
-                  <div className="absolute left-0 w-1 h-8 bg-white rounded-r-full" />
-                )}
-
-                {/* Label + Chevron (เฉพาะตอนไม่ย่อ) */}
-                {!isCollapsed && (
+                {({ isActive }) => (
                   <>
-                    <span className="font-medium flex-1">{item.text}</span>
-                    {location.pathname === item.to && (
-                      <FaChevronRight className="text-sm opacity-70" />
+                    {/* แถบ active ซ้าย (เฉพาะตอนขยาย) */}
+                    {isActive && !isCollapsed && (
+                      <div className="absolute left-0 w-1 h-8 bg-white rounded-r-full" />
+                    )}
+
+                    <div className={`${isCollapsed ? "" : "mr-3"} relative`}>
+                      <div
+                        className={`text-lg ${
+                          isActive ? "text-white" : "text-gray-500 group-hover:text-blue-600"
+                        }`}
+                      >
+                        {item.icon}
+                      </div>
+                    </div>
+
+                    {!isCollapsed && (
+                      <>
+                        <span className="font-medium flex-1 truncate">{item.text}</span>
+                        {isActive && <FaChevronRight className="text-sm opacity-70" />}
+                      </>
+                    )}
+
+                    {/* Tooltip ตอนย่อแถบ */}
+                    {isCollapsed && (
+                      <div className="absolute left-full ml-3 px-2 py-1 bg-gray-900 text-white text-sm rounded-md opacity-0 group-hover:opacity-100 transition-opacity duration-200 whitespace-nowrap">
+                        {item.text}
+                      </div>
                     )}
                   </>
                 )}
-
-                {/* Tooltip ตอนย่อ */}
-                
               </NavLink>
             ))}
           </nav>
