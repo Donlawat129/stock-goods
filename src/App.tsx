@@ -19,6 +19,7 @@ import Objects from "./components/FrontEnd/Objects"
 // Dashboard pages
 import Dashboard from "./components/pages/Dashboard/Dashboard";
 import ProductManagement from "./components/pages/Dashboard/ProductManagement";
+import HeroBanner from "./components/pages/Dashboard/HeroBanner";
 
 export default function App() {
   return (
@@ -48,6 +49,7 @@ export default function App() {
       <Route path="/Dashboard" element={<MainLayout />}>
         <Route index element={<Dashboard />} />
         <Route path="ProductManagement" element={<ProductManagement />} />
+        <Route path="HeroBanner" element={<HeroBanner />} />
         {/* ถ้ามีหน้าอื่น เติมตรงนี้ได้ */}
       </Route>
 
