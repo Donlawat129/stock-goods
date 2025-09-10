@@ -20,6 +20,8 @@ import {
   deleteHeroBanner,
   getHeroIntervalMs,
   setHeroIntervalMs,
+  ensureToken,     // 👈 เพิ่ม
+  getAuthInfo,     // 👈 เพิ่ม (ใช้ตั้งเวลาต่ออัตโนมัติ)
   type BannerRow,
 } from "../../../lib/sheetsClient";
 
@@ -99,13 +101,10 @@ export default function HeroBanner() {
   const [items, setItems] = useState<BannerRow[]>([]);
   const [intervalMs, setIntervalMs] = useState<number>(10000);
 
-  // Quick Add
-  const [quick, setQuick] = useState<BannerForm>(emptyForm);
-  const quickImageRef = useRef<HTMLInputElement>(null);
-
-  // Inline edit
-  const [editingRow, setEditingRow] = useState<number | null>(null);
-  const [editForm, setEditForm] = useState<BannerForm>(emptyForm);
+  // Unified Form (ใช้ทั้ง Add และ Edit)
+  const [form, setForm] = useState<BannerForm>(emptyForm);
+  const [mode, setMode] = useState<"add" | "edit">("add");
+  const [editingRowNumber, setEditingRowNumber] = useState<number | null>(null);
 
   // Toast
   const [toast, setToast] = useState<string>("");
@@ -121,6 +120,51 @@ export default function HeroBanner() {
       if (saveTimer.current) window.clearTimeout(saveTimer.current);
     };
   }, []);
+
+  // 👇 Auto-connect แบบ silent เมื่อเปิดหน้า
+  useEffect(() => {
+    let mounted = true;
+    (async () => {
+      try {
+        await ensureToken(); // พยายามขอ token แบบ "none"
+        if (!mounted) return;
+        setConnected(true);
+        await doRefresh();
+      } catch {
+        // เงียบไว้ → ให้ผู้ใช้กดปุ่ม Connect เองได้ตามปกติ
+      }
+    })();
+    return () => {
+      mounted = false;
+    };
+  }, []);
+
+  // 👇 (ทางเลือก) ตั้งเวลาขอ token ใหม่ก่อนหมดอายุอัตโนมัติ
+  useEffect(() => {
+    if (!connected) return;
+    let timer: number | null = null;
+
+    function schedule() {
+      const { expAt } = getAuthInfo();
+      const lead = 60 * 1000; // ขอใหม่ก่อนหมด 60s
+      const fallback = 45 * 60 * 1000; // ถ้ายังไม่ทราบ exp ให้รอ ~45 นาที
+      const wait = expAt ? Math.max(0, expAt - Date.now() - lead) : fallback;
+
+      timer = window.setTimeout(async () => {
+        try {
+          await requestSheetsToken("none");
+        } catch {
+          // ถ้าเงียบไม่เป็นไร fetchWithAuth จะ popup ให้เมื่อจำเป็น
+        }
+        schedule(); // ตั้งรอบถัดไป
+      }, wait);
+    }
+
+    schedule();
+    return () => {
+      if (timer) clearTimeout(timer);
+    };
+  }, [connected]);
 
   async function persistAutoplay(ms: number) {
     try {
@@ -145,17 +189,7 @@ export default function HeroBanner() {
     };
   }, [intervalMs]);
 
-  /* Sheets actions */
-  const connectSheets = async () => {
-    try {
-      await requestSheetsToken();
-      setConnected(true);
-      // อ่านทันที ไม่รอ state connected
-      await doRefresh();
-    } catch (e: any) {
-      alert(e?.message || "เชื่อม Google Sheets ไม่สำเร็จ");
-    }
-  };
+ 
 
   const doRefresh = async () => {
     setLoading(true);
@@ -179,26 +213,43 @@ export default function HeroBanner() {
     await doRefresh();
   };
 
-  async function addQuick(e: React.FormEvent) {
+  // ---- Submit ฟอร์มบน (ทำหน้าที่ทั้ง Add / Save) ----
+  async function submitForm(e: React.FormEvent) {
     e.preventDefault();
     if (!connected) return alert("กรุณา Connect Google Sheets ก่อน");
-    if (!quick.title.trim()) return alert("กรอก Title");
+    if (!form.title.trim()) return alert("กรอก Title");
 
     try {
-      await addHeroBanner(toPayload(quick));
-      setQuick(emptyForm);
+      if (mode === "add") {
+        await addHeroBanner(toPayload(form) as any);
+        setForm(emptyForm);
+        setToast("Added");
+      } else {
+        if (!editingRowNumber) return;
+        await updateHeroBanner(editingRowNumber, toPayload(form) as any);
+        setMode("add");
+        setEditingRowNumber(null);
+        setForm(emptyForm);
+        setToast("Updated");
+      }
       await refresh();
-      setToast("Added");
-      setTimeout(() => setToast(""), 900);
     } catch (e: any) {
-      alert(e?.message || "เพิ่มไม่สำเร็จ");
+      alert(e?.message || "บันทึกไม่สำเร็จ");
+    } finally {
+      setTimeout(() => setToast(""), 1000);
     }
   }
 
-  /* Inline Edit */
-  function startEdit(b: BannerRow) {
-    setEditingRow(b.rowNumber);
-    setEditForm({
+  function cancelEdit() {
+    setMode("add");
+    setEditingRowNumber(null);
+    setForm(emptyForm);
+  }
+
+  function startEditTop(b: BannerRow) {
+    setMode("edit");
+    setEditingRowNumber(b.rowNumber);
+    setForm({
       title: b.title,
       subtitle: b.subtitle,
       desc: b.desc,
@@ -206,20 +257,8 @@ export default function HeroBanner() {
       color: b.color,
       buttonColor: b.buttonColor,
     });
-  }
-
-  async function saveEdit(rowNumber: number) {
-    if (!connected) return alert("กรุณา Connect Google Sheets ก่อน");
-    if (!editForm.title.trim()) return alert("กรอก Title");
-    try {
-      await updateHeroBanner(rowNumber, toPayload(editForm));
-      setEditingRow(null);
-      await refresh();
-      setToast("Updated");
-      setTimeout(() => setToast(""), 900);
-    } catch (e: any) {
-      alert(e?.message || "บันทึกไม่สำเร็จ");
-    }
+    // เลื่อนขึ้นไปที่ฟอร์มเพื่อแก้ไขสะดวก
+    window.scrollTo({ top: 0, behavior: "smooth" });
   }
 
   async function remove(rowNumber: number) {
@@ -227,6 +266,8 @@ export default function HeroBanner() {
     if (!confirm("ลบแบนเนอร์นี้ใช่ไหม?")) return;
     try {
       await deleteHeroBanner(rowNumber);
+      // ถ้ากำลังแก้ไขแถวที่ถูกลบ ให้ยกเลิกโหมดแก้
+      if (mode === "edit" && editingRowNumber === rowNumber) cancelEdit();
       await refresh();
       setToast("Deleted");
       setTimeout(() => setToast(""), 900);
@@ -242,15 +283,15 @@ export default function HeroBanner() {
       <div className="flex items-center justify-between">
         <div>
           <h1 className="text-3xl font-bold text-gray-800">Banner Hero</h1>
-          <p className="text-gray-500">
-            Manage home page (synced with Google Sheets)
-          </p>
+          
         </div>
 
         <div className="flex items-center gap-2">
-          <PillButton onClick={connectSheets}>
-            <FiCloud /> {connected ? "Connected" : "Connect Google Sheets"}
-          </PillButton>
+          {connected && (
+            <span className="inline-flex items-center gap-2 rounded-xl border border-green-200 bg-green-50 px-3 py-2 text-sm text-green-700">
+              <FiCloud /> Connected
+            </span>
+          )}
           <PillButton onClick={refresh} disabled={!connected || loading}>
             <FiRefreshCw /> Refresh
           </PillButton>
@@ -290,26 +331,25 @@ export default function HeroBanner() {
         </div>
       </Card>
 
-      {/* Quick Add: ฟิลด์ตามคอลัมน์ใหม่ */}
+      {/* Unified Form: ใช้ Add/ Edit */}
       <Card>
         <form
-          onSubmit={addQuick}
+          onSubmit={submitForm}
           className="p-4 grid grid-cols-1 md:grid-cols-12 gap-3"
         >
           {/* Image */}
           <div className="md:col-span-4">
             <label className="block text-xs text-gray-500 mb-1">Image (URL)</label>
             <input
-              ref={quickImageRef}
               className="w-full rounded-xl border border-gray-300/70 bg-white px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-indigo-400/60 focus:border-transparent"
               placeholder="https://..."
-              value={quick.image}
-              onChange={(e) => setQuick({ ...quick, image: e.target.value })}
+              value={form.image}
+              onChange={(e) => setForm({ ...form, image: e.target.value })}
               disabled={!connected}
             />
             <div className="mt-2 h-12 w-12 rounded-md ring-1 ring-gray-200 overflow-hidden flex items-center justify-center bg-gray-50">
-              {quick.image ? (
-                <img src={quick.image} className="h-full w-full object-cover" />
+              {form.image ? (
+                <img src={form.image} className="h-full w-full object-cover" />
               ) : (
                 <FiImage className="text-gray-400" />
               )}
@@ -321,8 +361,8 @@ export default function HeroBanner() {
             <label className="block text-xs text-gray-500 mb-1">Title</label>
             <input
               className="w-full rounded-xl border border-gray-300/70 bg-white px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-indigo-400/60 focus:border-transparent"
-              value={quick.title}
-              onChange={(e) => setQuick({ ...quick, title: e.target.value })}
+              value={form.title}
+              onChange={(e) => setForm({ ...form, title: e.target.value })}
               disabled={!connected}
             />
           </div>
@@ -332,8 +372,8 @@ export default function HeroBanner() {
             <label className="block text-xs text-gray-500 mb-1">Subtitle</label>
             <input
               className="w-full rounded-xl border border-gray-300/70 bg-white px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-indigo-400/60 focus:border-transparent"
-              value={quick.subtitle}
-              onChange={(e) => setQuick({ ...quick, subtitle: e.target.value })}
+              value={form.subtitle}
+              onChange={(e) => setForm({ ...form, subtitle: e.target.value })}
               disabled={!connected}
             />
           </div>
@@ -344,8 +384,8 @@ export default function HeroBanner() {
             <textarea
               rows={3}
               className="w-full rounded-xl border border-gray-300/70 bg-white px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-indigo-400/60 focus:border-transparent resize-y"
-              value={quick.desc}
-              onChange={(e) => setQuick({ ...quick, desc: e.target.value })}
+              value={form.desc}
+              onChange={(e) => setForm({ ...form, desc: e.target.value })}
               disabled={!connected}
             />
           </div>
@@ -357,15 +397,15 @@ export default function HeroBanner() {
               <input
                 type="color"
                 className="h-10 w-12 rounded-md border border-gray-300/70"
-                value={quick.color || "#000000"}
-                onChange={(e) => setQuick({ ...quick, color: e.target.value })}
+                value={form.color || "#000000"}
+                onChange={(e) => setForm({ ...form, color: e.target.value })}
                 disabled={!connected}
               />
               <input
                 className="flex-1 rounded-xl border border-gray-300/70 bg-white px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-indigo-400/60 focus:border-transparent"
                 placeholder="#RRGGBB"
-                value={quick.color}
-                onChange={(e) => setQuick({ ...quick, color: e.target.value })}
+                value={form.color}
+                onChange={(e) => setForm({ ...form, color: e.target.value })}
                 disabled={!connected}
               />
             </div>
@@ -378,34 +418,47 @@ export default function HeroBanner() {
               <input
                 type="color"
                 className="h-10 w-12 rounded-md border border-gray-300/70"
-                value={quick.buttonColor || "#000000"}
+                value={form.buttonColor || "#000000"}
                 onChange={(e) =>
-                  setQuick({ ...quick, buttonColor: e.target.value })
+                  setForm({ ...form, buttonColor: e.target.value })
                 }
                 disabled={!connected}
               />
               <input
                 className="flex-1 rounded-xl border border-gray-300/70 bg-white px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-indigo-400/60 focus:border-transparent"
                 placeholder="#RRGGBB"
-                value={quick.buttonColor}
+                value={form.buttonColor}
                 onChange={(e) =>
-                  setQuick({ ...quick, buttonColor: e.target.value })
+                  setForm({ ...form, buttonColor: e.target.value })
                 }
                 disabled={!connected}
               />
             </div>
           </div>
 
-          <div className="md:col-span-12">
+          <div className="md:col-span-12 flex items-center gap-2">
             <PillButton type="submit" variant="primary" disabled={!connected}>
-              <FiPlus /> Add
+              {mode === "add" ? (
+                <>
+                  <FiPlus /> Add
+                </>
+              ) : (
+                <>
+                  <FiSave /> Save changes
+                </>
+              )}
             </PillButton>
+
+            {mode === "edit" && (
+              <PillButton onClick={cancelEdit}>
+                <FiX /> Cancel
+              </PillButton>
+            )}
           </div>
         </form>
       </Card>
 
-
-      {/* Table */}
+      {/* Table (อ่านอย่างเดียว) */}
       <Card>
         <div className="p-4 overflow-x-auto">
           <table className="min-w-full text-sm">
@@ -439,204 +492,89 @@ export default function HeroBanner() {
                 </tr>
               )}
 
-              {items.map((b, idx) => {
-                const editing = editingRow === b.rowNumber;
-                return (
-                  <tr
-                    key={`${b.rowNumber}-${b.title}`}
-                    className={`border-t ${
-                      idx % 2 ? "bg-gray-50/40" : "bg-white"
-                    } hover:bg-indigo-50/40 transition`}
-                  >
-                    <td className="py-3 pr-4 align-top">{idx + 1}</td>
+              {items.map((b, idx) => (
+                <tr
+                  key={`${b.rowNumber}-${b.title}`}
+                  className={`border-t ${
+                    idx % 2 ? "bg-gray-50/40" : "bg-white"
+                  } hover:bg-indigo-50/40 transition`}
+                >
+                  <td className="py-3 pr-4 align-top">{idx + 1}</td>
 
-                    {/* Image */}
-                    <td className="py-3 pr-4 align-top">
-                      {editing ? (
-                        <div className="flex items-center gap-2">
-                          <input
-                            className="w-56 rounded-xl border border-gray-300/70 bg-white px-3 py-2 text-sm"
-                            value={editForm.image}
-                            onChange={(e) =>
-                              setEditForm({ ...editForm, image: e.target.value })
-                            }
-                          />
-                          <div className="h-10 w-10 rounded-md ring-1 ring-gray-200 overflow-hidden bg-gray-50 flex items-center justify-center">
-                            {editForm.image ? (
-                              <img
-                                src={editForm.image}
-                                className="h-full w-full object-cover"
-                              />
-                            ) : (
-                              <FiImage className="text-gray-400" />
-                            )}
-                          </div>
-                        </div>
-                      ) : b.image ? (
-                        <img
-                          src={b.image}
-                          alt={b.title}
-                          className="h-12 w-12 object-cover rounded-md ring-1 ring-gray-200"
-                        />
-                      ) : (
-                        <div className="h-12 w-12 rounded-md bg-gray-100 flex items-center justify-center text-gray-400 ring-1 ring-gray-200">
-                          <FiImage />
-                        </div>
-                      )}
-                    </td>
+                  {/* Image */}
+                  <td className="py-3 pr-4 align-top">
+                    {b.image ? (
+                      <img
+                        src={b.image}
+                        alt={b.title}
+                        className="h-12 w-12 object-cover rounded-md ring-1 ring-gray-200"
+                      />
+                    ) : (
+                      <div className="h-12 w-12 rounded-md bg-gray-100 flex items-center justify-center text-gray-400 ring-1 ring-gray-200">
+                        <FiImage />
+                      </div>
+                    )}
+                  </td>
 
-                    {/* Title */}
-                    <td className="py-3 pr-4 align-top font-medium text-gray-800">
-                      {editing ? (
-                        <input
-                          className="w-56 rounded-xl border border-gray-300/70 bg-white px-3 py-2 text-sm"
-                          value={editForm.title}
-                          onChange={(e) =>
-                            setEditForm({ ...editForm, title: e.target.value })
-                          }
-                        />
-                      ) : (
-                        b.title
-                      )}
-                    </td>
+                  {/* Title */}
+                  <td className="py-3 pr-4 align-top font-medium text-gray-800">
+                    {b.title}
+                  </td>
 
-                    {/* Subtitle */}
-                    <td className="py-3 pr-4 align-top">
-                      {editing ? (
-                        <input
-                          className="w-56 rounded-xl border border-gray-300/70 bg-white px-3 py-2 text-sm"
-                          value={editForm.subtitle}
-                          onChange={(e) =>
-                            setEditForm({
-                              ...editForm,
-                              subtitle: e.target.value,
-                            })
-                          }
-                        />
-                      ) : (
-                        b.subtitle
-                      )}
-                    </td>
+                  {/* Subtitle */}
+                  <td className="py-3 pr-4 align-top">{b.subtitle}</td>
 
-                    {/* Desc */}
-                    <td className="py-3 pr-4 align-top max-w-[520px]">
-                      {editing ? (
-                        <textarea
-                          rows={3}
-                          className="w-full rounded-xl border border-gray-300/70 bg-white px-3 py-2 text-sm"
-                          value={editForm.desc}
-                          onChange={(e) =>
-                            setEditForm({ ...editForm, desc: e.target.value })
-                          }
-                        />
-                      ) : (
-                        <div className="line-clamp-3" title={b.desc}>
-                          {b.desc}
-                        </div>
-                      )}
-                    </td>
+                  {/* Desc */}
+                  <td className="py-3 pr-4 align-top max-w-[520px]">
+                    <div className="line-clamp-3" title={b.desc}>
+                      {b.desc}
+                    </div>
+                  </td>
 
-                    {/* Color */}
-                    <td className="py-3 pr-4 align-top">
-                      {editing ? (
-                        <div className="flex items-center gap-2">
-                          <input
-                            type="color"
-                            className="h-10 w-12 rounded-md border border-gray-300/70"
-                            value={editForm.color || "#000000"}
-                            onChange={(e) => setEditForm({ ...editForm, color: e.target.value })}
-                          />
-                          <input
-                            className="w-36 rounded-xl border border-gray-300/70 bg-white px-3 py-2 text-sm"
-                            placeholder="#RRGGBB"
-                            value={editForm.color}
-                            onChange={(e) => setEditForm({ ...editForm, color: e.target.value })}
-                          />
-                        </div>
-                      ) : (
-                        <div className="inline-flex items-center gap-2">
-                          <span
-                            className="h-4 w-6 rounded ring-1 ring-gray-300 inline-block"
-                            style={{ backgroundColor: b.color || "transparent" }}
-                          />
-                          <span>{b.color || "-"}</span>
-                        </div>
-                      )}
-                    </td>
+                  {/* Color */}
+                  <td className="py-3 pr-4 align-top">
+                    <div className="inline-flex items-center gap-2">
+                      <span
+                        className="h-4 w-6 rounded ring-1 ring-gray-300 inline-block"
+                        style={{ backgroundColor: b.color || "transparent" }}
+                      />
+                      <span>{b.color || "-"}</span>
+                    </div>
+                  </td>
 
-                    {/* ButtonColor */}
-                    <td className="py-3 pr-4 align-top">
-                      {editing ? (
-                        <div className="flex items-center gap-2">
-                          <input
-                            type="color"
-                            className="h-10 w-12 rounded-md border border-gray-300/70"
-                            value={editForm.buttonColor || "#000000"}
-                            onChange={(e) =>
-                              setEditForm({ ...editForm, buttonColor: e.target.value })
-                            }
-                          />
-                          <input
-                            className="w-36 rounded-xl border border-gray-300/70 bg-white px-3 py-2 text-sm"
-                            placeholder="#RRGGBB"
-                            value={editForm.buttonColor}
-                            onChange={(e) =>
-                              setEditForm({ ...editForm, buttonColor: e.target.value })
-                            }
-                          />
-                        </div>
-                      ) : (
-                        <div className="inline-flex items-center gap-2">
-                          <span
-                            className="h-4 w-6 rounded ring-1 ring-gray-300 inline-block"
-                            style={{ backgroundColor: b.buttonColor || "transparent" }}
-                          />
-                          <span>{b.buttonColor || "-"}</span>
-                        </div>
-                      )}
-                    </td>
+                  {/* ButtonColor */}
+                  <td className="py-3 pr-4 align-top">
+                    <div className="inline-flex items-center gap-2">
+                      <span
+                        className="h-4 w-6 rounded ring-1 ring-gray-300 inline-block"
+                        style={{
+                          backgroundColor: b.buttonColor || "transparent",
+                        }}
+                      />
+                      <span>{b.buttonColor || "-"}</span>
+                    </div>
+                  </td>
 
-
-                    {/* Actions */}
-                    <td className="py-3 pr-4 align-top">
-                      {editing ? (
-                        <div className="flex gap-2">
-                          <PillButton
-                            variant="primary"
-                            onClick={() => saveEdit(b.rowNumber)}
-                            disabled={!connected}
-                          >
-                            <FiSave /> Save
-                          </PillButton>
-                          <PillButton
-                            onClick={() => {
-                              setEditingRow(null);
-                            }}
-                          >
-                            <FiX /> Cancel
-                          </PillButton>
-                        </div>
-                      ) : (
-                        <div className="flex gap-2">
-                          <PillButton
-                            onClick={() => startEdit(b)}
-                            disabled={!connected}
-                          >
-                            <FiEdit2 /> Edit
-                          </PillButton>
-                          <PillButton
-                            variant="danger"
-                            onClick={() => remove(b.rowNumber)}
-                            disabled={!connected}
-                          >
-                            <FiTrash2 /> Delete
-                          </PillButton>
-                        </div>
-                      )}
-                    </td>
-                  </tr>
-                );
-              })}
+                  {/* Actions */}
+                  <td className="py-3 pr-4 align-top">
+                    <div className="flex gap-2">
+                      <PillButton
+                        onClick={() => startEditTop(b)}
+                        disabled={!connected}
+                      >
+                        <FiEdit2 /> Edit
+                      </PillButton>
+                      <PillButton
+                        variant="danger"
+                        onClick={() => remove(b.rowNumber)}
+                        disabled={!connected}
+                      >
+                        <FiTrash2 /> Delete
+                      </PillButton>
+                    </div>
+                  </td>
+                </tr>
+              ))}
             </tbody>
           </table>
         </div>
