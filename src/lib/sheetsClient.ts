@@ -50,7 +50,9 @@ function ensureGisLoaded(): Promise<void> {
     if (ok()) return resolve();
 
     // ถ้ามีแท็กแล้วรอให้โหลดเสร็จ
-    const existing = document.querySelector<HTMLScriptElement>('script[src*="accounts.google.com/gsi/client"]');
+    const existing = document.querySelector<HTMLScriptElement>(
+      'script[src*="accounts.google.com/gsi/client"]'
+    );
     if (existing) {
       const iv = setInterval(() => {
         if (ok()) {
@@ -140,14 +142,22 @@ export function getAuthInfo() {
 }
 
 // ---------- Fetch helper (auto refresh on 401) ----------
-async function fetchWithAuth(url: string, init: RequestInit = {}, retry = true): Promise<Response> {
+async function fetchWithAuth(
+  url: string,
+  init: RequestInit = {},
+  retry = true
+): Promise<Response> {
   // 1) ถ้ายังไม่มี token ลอง silent ก่อน
   if (!accessToken) {
-    try { await requestSheetsToken("none"); } catch {}
+    try {
+      await requestSheetsToken("none");
+    } catch {}
   }
   // 2) ถ้ายังไม่มีอีก ให้ popup consent อัตโนมัติ (ครั้งแรก)
   if (!accessToken) {
-    try { await requestSheetsToken("consent"); } catch {}
+    try {
+      await requestSheetsToken("consent");
+    } catch {}
   }
 
   const headers = new Headers(init.headers || {});
@@ -171,7 +181,9 @@ async function fetchWithAuth(url: string, init: RequestInit = {}, retry = true):
 // ---------- Generic read ----------
 export async function readSheet(tabName?: string) {
   const range = `${tabName || SHEET_TAB}!A1:Z`;
-  const url = `https://sheets.googleapis.com/v4/spreadsheets/${SHEET_ID}/values/${encodeURIComponent(range)}`;
+  const url = `https://sheets.googleapis.com/v4/spreadsheets/${SHEET_ID}/values/${encodeURIComponent(
+    range
+  )}`;
   const res = await fetchWithAuth(url);
   if (!res.ok) throw new Error(await res.text());
   return res.json();
@@ -194,7 +206,9 @@ export async function appendUserRow(uid: string, email: string, password: string
 
 export async function readUsers() {
   const range = `${SHEET_TAB}!A1:C`; // uid | email | password
-  const url = `https://sheets.googleapis.com/v4/spreadsheets/${SHEET_ID}/values/${encodeURIComponent(range)}`;
+  const url = `https://sheets.googleapis.com/v4/spreadsheets/${SHEET_ID}/values/${encodeURIComponent(
+    range
+  )}`;
   const res = await fetchWithAuth(url);
   if (!res.ok) throw new Error(await res.text());
   const data = (await res.json()) as { values?: string[][] };
@@ -214,14 +228,14 @@ export async function findUserByEmailPassword(email: string, password: string) {
 
 // ========== Products ==========
 export type ProductRow = {
-  rowNumber: number;   // แถวจริง (1-based) เพื่อแก้ไข/ลบ
-  id: string;          // A
-  imageUrl: string;    // B
-  name: string;        // C
-  category: string;    // D
+  rowNumber: number; // แถวจริง (1-based) เพื่อแก้ไข/ลบ
+  id: string; // A
+  imageUrl: string; // B
+  name: string; // C
+  category: string; // D
   description: string; // E
-  price: string;       // F
-  quantity: string;    // G
+  price: string; // F
+  quantity: string; // G
 };
 
 // หา Product ID ถัดไปแบบเรียงเลข 1,2,3,...
@@ -240,13 +254,14 @@ export async function getNextProductId(
   return String(max + 1 || 1);
 }
 
-
 // อ่านสินค้าทั้งหมด (A..G)
 export async function getProducts(
   tab = TAB_PRODUCTS
 ): Promise<{ header: string[]; items: ProductRow[] }> {
   const range = `${tab}!A1:G`;
-  const url = `https://sheets.googleapis.com/v4/spreadsheets/${SHEET_ID}/values/${encodeURIComponent(range)}`;
+  const url = `https://sheets.googleapis.com/v4/spreadsheets/${SHEET_ID}/values/${encodeURIComponent(
+    range
+  )}`;
   const res = await fetchWithAuth(url);
   if (!res.ok) throw new Error(await res.text());
 
@@ -287,15 +302,17 @@ export async function addProduct(
     tab
   )}!A1:append?valueInputOption=USER_ENTERED`;
   const body = {
-    values: [[
-      p.id ?? "",
-      p.imageUrl ?? "",
-      p.name ?? "",
-      p.category ?? "",
-      p.description ?? "",
-      String(p.price ?? ""),
-      String(p.quantity ?? ""),
-    ]],
+    values: [
+      [
+        p.id ?? "",
+        p.imageUrl ?? "",
+        p.name ?? "",
+        p.category ?? "",
+        p.description ?? "",
+        String(p.price ?? ""),
+        String(p.quantity ?? ""),
+      ],
+    ],
   };
   const res = await fetchWithAuth(url, {
     method: "POST",
@@ -325,15 +342,17 @@ export async function updateProduct(
     range
   )}?valueInputOption=USER_ENTERED`;
   const body = {
-    values: [[
-      p.id ?? "",
-      p.imageUrl ?? "",
-      p.name ?? "",
-      p.category ?? "",
-      p.description ?? "",
-      String(p.price ?? ""),
-      String(p.quantity ?? ""),
-    ]],
+    values: [
+      [
+        p.id ?? "",
+        p.imageUrl ?? "",
+        p.name ?? "",
+        p.category ?? "",
+        p.description ?? "",
+        String(p.price ?? ""),
+        String(p.quantity ?? ""),
+      ],
+    ],
   };
   const res = await fetchWithAuth(url, {
     method: "PUT",
@@ -347,7 +366,9 @@ export async function updateProduct(
 // ลบสินค้า (clear) A..G
 export async function deleteProduct(rowNumber: number, tab = TAB_PRODUCTS) {
   const range = `${tab}!A${rowNumber}:G${rowNumber}`;
-  const url = `https://sheets.googleapis.com/v4/spreadsheets/${SHEET_ID}/values/${encodeURIComponent(range)}:clear`;
+  const url = `https://sheets.googleapis.com/v4/spreadsheets/${SHEET_ID}/values/${encodeURIComponent(
+    range
+  )}:clear`;
   const res = await fetchWithAuth(url, {
     method: "POST",
     headers: { "Content-Type": "application/json" },
@@ -357,7 +378,6 @@ export async function deleteProduct(rowNumber: number, tab = TAB_PRODUCTS) {
   return res.json();
 }
 
-
 // ----- alias ให้ตรงกับหน้า ProductManagement.tsx -----
 export const updateProductRow = updateProduct;
 export const deleteProductRow = deleteProduct;
@@ -365,16 +385,15 @@ export const deleteProductRow = deleteProduct;
 // ====== Banner Hero (Google Sheets) ======
 const TAB_BANNER_HERO =
   (import.meta.env.VITE_SHEET_TAB_BANNERHERO as string) || "BannerHero";
-const TAB_CONFIG = "Config"; // เก็บค่า interval (ถ้าไม่มี system จะสร้างให้เอง)
 
 export type BannerRow = {
-  rowNumber: number;      // แถวจริงในชีต, ไว้ใช้ update/delete
-  id: string;             // A
-  imageUrl: string;       // B
-  title: string;          // C
-  subtitle: string;       // D
-  buttonText: string;     // E
-  buttonType: string;     // F  (Mens|Womens|Objects)
+  rowNumber: number; // แถวจริงในชีต, ไว้ใช้ update/delete
+  id: string; // A
+  imageUrl: string; // B
+  title: string; // C
+  subtitle: string; // D
+  buttonText: string; // E
+  buttonType: string; // F  (Mens|Womens|Objects)
 };
 
 // อ่าน Banner ทั้งหมด (A..F)
@@ -382,7 +401,9 @@ export async function getHeroBanners(
   tab = TAB_BANNER_HERO
 ): Promise<{ header: string[]; items: BannerRow[] }> {
   const range = `${tab}!A1:F`;
-  const url = `https://sheets.googleapis.com/v4/spreadsheets/${SHEET_ID}/values/${encodeURIComponent(range)}`;
+  const url = `https://sheets.googleapis.com/v4/spreadsheets/${SHEET_ID}/values/${encodeURIComponent(
+    range
+  )}`;
   const res = await fetchWithAuth(url);
   if (!res.ok) throw new Error(await res.text());
   const data = (await res.json()) as { values?: string[][] };
@@ -413,14 +434,16 @@ export async function addHeroBanner(
     tab
   )}!A1:append?valueInputOption=USER_ENTERED`;
   const body = {
-    values: [[
-      b.id ?? "",
-      b.imageUrl ?? "",
-      b.title ?? "",
-      b.subtitle ?? "",
-      b.buttonText ?? "",
-      b.buttonType ?? "",
-    ]],
+    values: [
+      [
+        b.id ?? "",
+        b.imageUrl ?? "",
+        b.title ?? "",
+        b.subtitle ?? "",
+        b.buttonText ?? "",
+        b.buttonType ?? "",
+      ],
+    ],
   };
   const res = await fetchWithAuth(url, {
     method: "POST",
@@ -442,14 +465,16 @@ export async function updateHeroBanner(
     range
   )}?valueInputOption=USER_ENTERED`;
   const body = {
-    values: [[
-      b.id ?? "",
-      b.imageUrl ?? "",
-      b.title ?? "",
-      b.subtitle ?? "",
-      b.buttonText ?? "",
-      b.buttonType ?? "",
-    ]],
+    values: [
+      [
+        b.id ?? "",
+        b.imageUrl ?? "",
+        b.title ?? "",
+        b.subtitle ?? "",
+        b.buttonText ?? "",
+        b.buttonType ?? "",
+      ],
+    ],
   };
   const res = await fetchWithAuth(url, {
     method: "PUT",
@@ -475,30 +500,33 @@ export async function deleteHeroBanner(rowNumber: number, tab = TAB_BANNER_HERO)
   return res.json();
 }
 
-// ---- Config: interval (ms) ที่แท็บ "Config" ----
-export async function getHeroIntervalMs(tab = TAB_CONFIG): Promise<number> {
-  const range = `${tab}!A1:B1`;
+// ---- Autoplay interval: เก็บในคอลัมน์ "Config" (คอลัมน์ G) แถว 2 ของแท็บ BannerHero ----
+const HERO_CONFIG_COL = "G";
+const HERO_CONFIG_ROW = 2; // แถวข้อมูล (แถว 1 คือหัวตาราง)
+
+export async function getHeroIntervalMs(): Promise<number> {
+  const range = `${TAB_BANNER_HERO}!${HERO_CONFIG_COL}${HERO_CONFIG_ROW}:${HERO_CONFIG_COL}${HERO_CONFIG_ROW}`;
   const url = `https://sheets.googleapis.com/v4/spreadsheets/${SHEET_ID}/values/${encodeURIComponent(
     range
   )}`;
   try {
     const res = await fetchWithAuth(url);
-    if (!res.ok) return 5000;
+    if (!res.ok) return 10000; // default
     const data = (await res.json()) as { values?: string[][] };
-    const val = data.values?.[0]?.[1];
-    const ms = Number(val);
-    return Number.isFinite(ms) ? ms : 5000;
+    const v = data.values?.[0]?.[0];
+    const n = Number(v);
+    return Number.isFinite(n) && n > 0 ? n : 10000;
   } catch {
-    return 5000;
+    return 10000;
   }
 }
 
-export async function setHeroIntervalMs(ms: number, tab = TAB_CONFIG) {
-  const range = `${tab}!A1:B1`;
+export async function setHeroIntervalMs(ms: number) {
+  const range = `${TAB_BANNER_HERO}!${HERO_CONFIG_COL}${HERO_CONFIG_ROW}:${HERO_CONFIG_COL}${HERO_CONFIG_ROW}`;
   const url = `https://sheets.googleapis.com/v4/spreadsheets/${SHEET_ID}/values/${encodeURIComponent(
     range
   )}?valueInputOption=USER_ENTERED`;
-  const body = { values: [["HERO_INTERVAL_MS", String(ms)]] };
+  const body = { values: [[String(ms)]] }; // เขียนเลขล้วนลง G2
   const res = await fetchWithAuth(url, {
     method: "PUT",
     headers: { "Content-Type": "application/json" },
