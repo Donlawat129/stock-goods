@@ -28,9 +28,9 @@ const Sidebar = () => {
     user?.name ?? (user?.email ? user.email.split("@")[0] : "User Name");
   const displayEmail = user?.email ?? "admin@dabang.com";
 
-  // ✅ เปลี่ยน JSX.Element → ReactNode
   const navItems: { icon: ReactNode; text: string; to: string }[] = [
     { icon: <FaTachometerAlt />, text: "Dashboard",          to: "/Dashboard" },
+    { icon: <FaChevronRight />,           text: "Hero Banner", to: "/Dashboard/HeroBanner" },
     { icon: <FaBox />,           text: "Product Management", to: "/Dashboard/ProductManagement" },
   ];
 
