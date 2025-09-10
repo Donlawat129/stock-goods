@@ -1,4 +1,4 @@
-import { BrowserRouter, Routes, Route } from "react-router-dom";
+import { BrowserRouter, Routes, Route,Navigate } from "react-router-dom";
 
 // Auth
 import LoginPage from "./components/pages/LoginPages";
@@ -30,6 +30,7 @@ export default function App() {
           <Route path="/objects" element={<Objects />} /> 
         </Route>
 
+
         {/* กลุ่ม Auth */}
         <Route path="/login" element={<LoginPage />} />
         <Route path="/register" element={<RegisterPage />} />
@@ -39,8 +40,16 @@ export default function App() {
           <Route index element={<Dashboard />} />
           {/* <Route path="repair" element={<Repair />} /> */}
         </Route>
+        
+        {/* กลุ่มหน้า Dashboard */}
+      <Route path="/Dashboard" element={<MainLayout />}>
+        <Route index element={<Dashboard />} />
+        <Route path="ProductManagement" element={<ProductManagement />} />
+        {/* ถ้ามีหน้าอื่น เติมตรงนี้ได้ */}
+      </Route>
 
-        <Route path="/ProductManagement" element={<ProductManagement />} />
+      {/* ไม่เจอเส้นทางใด ๆ เด้งกลับ Dashboard */}
+      <Route path="*" element={<Navigate to="/Dashboard" replace />} />
 
       </Routes>
     </BrowserRouter>
