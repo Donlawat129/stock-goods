@@ -1,10 +1,35 @@
 // src/components/dashboard/Dashboard.tsx
 import type { JSX } from "react";
-import { useMemo, useState } from "react";
+import { useEffect, useMemo, useState } from "react";
 import {
-  FiSearch, FiChevronDown, FiBell, FiShoppingCart, FiDollarSign, FiUsers, FiBox,
+  FiShoppingCart, FiDollarSign, FiUsers, FiBox,
   FiTrendingUp, FiPieChart, FiMap, FiTarget,
 } from "react-icons/fi";
+
+// เชื่อม Google Sheets
+import {
+  requestSheetsToken,
+  getProducts,
+  readSheet,
+  readUsers,
+} from "../../../lib/sheetsClient";
+
+// ---------- Utils ----------
+const months = ["J","F","M","A","M","J","J","A","S","O","N","D"] as const;
+const CIRC = 2 * Math.PI * 40;
+const clamp01 = (v: number) => Math.max(0, Math.min(1, v));
+const toPercent = (v: number) => `${Math.round(clamp01(v) * 100)}%`;
+const money = (n: number) =>
+  new Intl.NumberFormat("en-US", { style: "currency", currency: "USD", maximumFractionDigits: 0 }).format(n);
+
+const lc = (s: unknown) => (s ?? "").toString().trim().toLowerCase();
+const num = (v: unknown) => (typeof v === "number" ? v : Number((v ?? "").toString().replace(/,/g, ""))) || 0;
+const idx = (h: string[], keys: string[]) => h.findIndex((x) => keys.includes(lc(x)));
+
+function ymd(d = new Date()) {
+  const z = new Date(d.getTime() - d.getTimezoneOffset() * 60000);
+  return z.toISOString().slice(0, 10);
+}
 
 // ---------- Types ----------
 type Stat = {
@@ -18,98 +43,176 @@ type Stat = {
 
 type ShowcaseProduct = {
   name: string;
-  popularity: number; // 0-100
+  popularity: number;
   sales: string;
-  color: string; // tailwind bg color class
+  color: string;
 };
 
-// ถ้าต้องการผูกกับชีต ทีหลังค่อยคำนวณจาก items ได้
-export interface ProductItem {
-  rowNumber: number;
-  id: string;
-  imageUrl: string;
-  name: string;
-  description: string;
-  price: string;
-}
-
-const months = ["J","F","M","A","M","J","J","A","S","O","N","D"] as const;
-
-// ===== utils =====
-const clamp01 = (v: number) => Math.max(0, Math.min(1, v));
-const toPercent = (v: number) => `${Math.round(clamp01(v) * 100)}%`;
-const CIRC = 2 * Math.PI * 40; // r=40 -> 251.2
-
+// ---------- Component ----------
 export default function DashboardContent() {
-  // --- สลับช่วงกราฟ ---
   const [activeTab, setActiveTab] = useState<"daily" | "weekly" | "monthly">("daily");
 
-  // --- การ์ดสถิติ ---
+  // ตัวเลขจริง
+  const [todaysSales, setTodaysSales]   = useState(0);
+  const [totalOrders, setTotalOrders]   = useState(0);
+  const [productsSold, setProductsSold] = useState(0);
+  const [newCustomers, setNewCustomers] = useState(0);
+
+  // กราฟ
+  const [visitorData, setVisitorData] = useState<number[]>(Array(12).fill(0));
+  const [revenueData, setRevenueData] = useState<number[]>(Array(12).fill(0));
+
+  // Top products
+  const [products, setProducts] = useState<ShowcaseProduct[]>([]);
+
+  useEffect(() => {
+    (async () => {
+      try {
+        await requestSheetsToken("consent");
+
+        // ===== Products =====
+        try {
+          const prods = await getProducts();
+          setProductsSold(prods.items.length);
+          // เลือก 4 ตัวแรกทำ Top Products (ความยาวแถบจากราคา หรือตั้งกลาง ๆ ถ้าไม่มีราคา)
+          const top = prods.items.slice(0, 4).map((p, i) => ({
+            name: p.name || `Product ${i+1}`,
+            popularity: Math.max(10, Math.min(95, p.price ? Math.round(Number(p.price)) : 70 - i*10)),
+            sales: `${Math.min(45 - i*5, 45)}%`,
+            color: ["bg-blue-500", "bg-purple-500", "bg-green-500", "bg-amber-500"][i]!,
+          }));
+          setProducts(top);
+        } catch { setProductsSold(0); setProducts([]); }
+
+        // ===== Orders (ถ้ามี) → ใช้เป็นแหล่งหลัก =====
+        let usedOrders = false;
+        try {
+          const raw = (await readSheet("Orders")) as any;
+          const values: string[][] = raw?.values || [];
+          const [h=[], ...rows] = values;
+          if (rows.length) {
+            usedOrders = true;
+            const H = h.map(lc);
+            const iDate  = idx(H, ["date","created","createdat","orderdate","วันที่"]);
+            const iQty   = idx(H, ["qty","quantity","จำนวน"]);
+            const iPrice = idx(H, ["price","unitprice","amount","ราคา"]);
+            const iTotal = idx(H, ["total","grandtotal","sum","ยอดรวม"]);
+
+            let todaySum = 0;
+            let orderCnt = 0;
+            const revByMonth = Array(12).fill(0);
+            const visitByMonth = Array(12).fill(0);
+            const today = ymd();
+
+            for (const r of rows) {
+              const d = r[iDate] ? new Date(r[iDate]) : null;
+              const m = d ? new Date(d).getMonth() : 0;
+              const dayKey = d ? ymd(d) : "";
+
+              let total = 0;
+              if (iTotal >= 0 && r[iTotal]) total = num(r[iTotal]);
+              else {
+                const q = iQty >= 0 ? num(r[iQty]) : 1;
+                const p = iPrice >= 0 ? num(r[iPrice]) : 0;
+                total = q * p;
+              }
+
+              if (total > 0) {
+                revByMonth[m] += total;
+                visitByMonth[m] += 1;
+                orderCnt += 1;
+              }
+              if (dayKey === today) todaySum += total;
+            }
+
+            setTodaysSales(todaySum);
+            setTotalOrders(orderCnt);
+            setRevenueData(revByMonth);
+            setVisitorData(visitByMonth);
+          }
+        } catch { /* no Orders */ }
+
+        // ===== StockLogs (fallback ถ้าไม่มี Orders) =====
+        if (!usedOrders) {
+          try {
+            const raw = (await readSheet("StockLogs")) as any;
+            const values: string[][] = raw?.values || [];
+            const [h=[], ...rows] = values;
+            const H = h.map(lc);
+            const iDate   = idx(H, ["date","datetime","created","createdat","วันที่","วันเวลา"]);
+            const iAction = idx(H, ["action","type","ประเภท"]);
+            const iQty    = idx(H, ["qty","quantity","จำนวน"]);
+            const iPrice  = idx(H, ["price","unitprice","amount","ราคา"]);
+            // “out” ถือเป็นยอดขาย; “out” 1 รายการ = 1 ออเดอร์
+            let todaySum = 0, orderCnt = 0;
+            const revByMonth = Array(12).fill(0);
+            const visitByMonth = Array(12).fill(0);
+            const today = ymd();
+
+            for (const r of rows) {
+              const action = lc(r[iAction]);
+              const d = r[iDate] ? new Date(r[iDate]) : null;
+              const m = d ? new Date(d).getMonth() : 0;
+              const dayKey = d ? ymd(d) : "";
+              const q = iQty >= 0 ? num(r[iQty]) : 0;
+              const p = iPrice >= 0 ? num(r[iPrice]) : 0;
+
+              if (["out","ขาย","เบิกออก","ปรับ-","adjust-"].includes(action)) {
+                const total = Math.abs(q) * p;
+                revByMonth[m] += total;
+                visitByMonth[m] += 1;
+                orderCnt += 1;
+                if (dayKey === today) todaySum += total;
+              }
+            }
+            setTodaysSales(todaySum);
+            setTotalOrders(orderCnt);
+            setRevenueData(revByMonth);
+            setVisitorData(visitByMonth);
+          } catch { /* ignore */ }
+        }
+
+        // ===== Users (นับลูกค้าใหม่ของวันนี้ ถ้ามีคอลัมน์วันที่) =====
+        try {
+          const u = await readUsers();
+          const H = u.header.map(lc);
+          const iCreated = idx(H, ["created","createdat","date","joinedat","วันที่"]);
+          if (iCreated >= 0) {
+            const today = ymd();
+            const countToday = u.rows.filter(r => (r[iCreated] ? ymd(new Date(r[iCreated])) : "") === today).length;
+            setNewCustomers(countToday);
+          } else setNewCustomers(0);
+        } catch { setNewCustomers(0); }
+      } catch (err) {
+        console.error(err);
+      }
+    })();
+  }, []);
+
+  // ปรับสเกลกราฟ
+  const visitorPct = useMemo(() => {
+    const max = Math.max(...visitorData, 1);
+    return visitorData.map(v => v / max);
+  }, [visitorData]);
+
+  const revenuePct = useMemo(() => {
+    const max = Math.max(...revenueData, 1);
+    return revenueData.map(v => v / max);
+  }, [revenueData]);
+
+  // การ์ดสถิติ (หน้าตาเหมือนภาพ)
   const stats: Stat[] = [
-    { title: "Today's Sales", value: "$1,892", change: "+1.5% from yesterday", textColor: "text-blue-600", bgColor: "bg-blue-100", icon: <FiDollarSign className="text-blue-600" /> },
-    { title: "Total Orders", value: "300",   change: "+5% from yesterday",     textColor: "text-purple-600", bgColor: "bg-purple-100", icon: <FiShoppingCart className="text-purple-600" /> },
-    { title: "Products Sold", value: "512",  change: "+12% from yesterday",    textColor: "text-green-600",  bgColor: "bg-green-100",  icon: <FiBox className="text-green-600" /> },
-    { title: "New Customers", value: "86",   change: "+8% from yesterday",     textColor: "text-amber-600",  bgColor: "bg-amber-100",  icon: <FiUsers className="text-amber-600" /> },
+    { title: "Today's Sales", value: money(todaysSales), change: "+1.5% from yesterday", textColor: "text-blue-600",   bgColor: "bg-blue-100",   icon: <FiDollarSign  className="text-blue-600" /> },
+    { title: "Total Orders",  value: String(totalOrders), change: "+5% from yesterday",    textColor: "text-purple-600", bgColor: "bg-purple-100", icon: <FiShoppingCart className="text-purple-600" /> },
+    { title: "Products Sold", value: String(productsSold),change: "+12% from yesterday",   textColor: "text-green-600",  bgColor: "bg-green-100",  icon: <FiBox        className="text-green-600" /> },
+    { title: "New Customers", value: String(newCustomers),change: "+8% from yesterday",    textColor: "text-amber-600",  bgColor: "bg-amber-100",  icon: <FiUsers      className="text-amber-600" /> },
   ];
 
-  const products: ShowcaseProduct[] = [
-    { name: "Home Decor Range",    popularity: 85, sales: "45%", color: "bg-blue-500" },
-    { name: "Disney Princess Bag", popularity: 60, sales: "20%", color: "bg-purple-500" },
-    { name: "Bathroom Essentials", popularity: 75, sales: "35%", color: "bg-green-500" },
-    { name: "Apple Smartwatches",  popularity: 50, sales: "25%", color: "bg-amber-500" },
-  ];
-
-  // mock graph data
-  const visitorData = [65, 59, 80, 81, 56, 55, 40, 58, 75, 82, 90, 95];
-  const revenueData = [1200, 1900, 1500, 2100, 1800, 2500, 2200, 2800, 3200, 3500, 3800, 4200];
   const targetPercent = 98;
-
-  // scale กราฟเป็นเปอร์เซ็นต์จริง
-  const visitorMax = Math.max(...visitorData, 100);
-  const revenueMax = Math.max(...revenueData);
-  const visitorPct = useMemo(() => visitorData.map(v => v / visitorMax), [visitorData, visitorMax]);
-  const revenuePct = useMemo(() => revenueData.map(v => v / revenueMax), [revenueData, revenueMax]);
 
   return (
     <div className="flex-1 p-6 space-y-6 bg-gradient-to-br from-gray-50 to-blue-50 min-h-screen">
-      {/* Header */}
-      <div className="flex flex-col items-start justify-between space-y-4 md:flex-row md:items-center">
-        <div>
-          <h1 className="text-3xl font-bold text-gray-800">Dashboard</h1>
-          <p className="text-gray-500">Welcome back, Syndtechdev! Here's what's happening today.</p>
-        </div>
-        <div className="flex items-center space-x-4">
-          <div className="relative">
-            <input
-              type="text"
-              placeholder="Search here..."
-              className="py-2 pl-10 pr-4 w-full md:w-64 border border-gray-300 rounded-full focus:outline-none focus:ring-2 focus:ring-blue-400 focus:border-transparent"
-            />
-            <FiSearch className="absolute left-3 top-3 text-gray-400" />
-          </div>
-          <div className="flex items-center space-x-2 p-2 rounded-lg bg-white border border-gray-200 cursor-pointer">
-            <span className="text-gray-600 text-sm">Eng (US)</span>
-            <FiChevronDown className="text-gray-400" />
-          </div>
-          <div className="relative p-2 rounded-lg bg-white border border-gray-200 cursor-pointer">
-            <FiBell className="text-gray-600" />
-            <span className="absolute -top-1 -right-1 bg-red-500 text-white text-xs rounded-full h-4 w-4 flex items-center justify-center">3</span>
-          </div>
-          <div className="flex items-center space-x-2">
-            <img
-              src="https://marketplace.canva.com/m3zhI/MAEWdFm3zhI/1/tl/canva-human-face.-MAEWdFm3zhI.png"
-              alt="profile"
-              className="w-10 h-10 rounded-full border-2 border-blue-300"
-            />
-            <div className="hidden md:block text-sm">
-              <p className="font-medium text-gray-800">Syndtechdev</p>
-              <p className="text-blue-500">Admin</p>
-            </div>
-          </div>
-        </div>
-      </div>
-
-      {/* Stats */}
+      {/* Stats row */}
       <div className="grid grid-cols-1 gap-6 md:grid-cols-2 lg:grid-cols-4">
         {stats.map((stat, idx) => (
           <div key={idx} className="p-6 bg-white rounded-xl shadow-sm hover:shadow-md transition-all duration-300 border border-gray-100">
@@ -123,7 +226,7 @@ export default function DashboardContent() {
         ))}
       </div>
 
-      {/* Charts */}
+      {/* Charts row */}
       <div className="grid grid-cols-1 gap-6 lg:grid-cols-2 xl:grid-cols-3">
         {/* Visitor Insights */}
         <div className="p-6 bg-white rounded-xl shadow-sm border border-gray-100">
@@ -201,7 +304,7 @@ export default function DashboardContent() {
         </div>
       </div>
 
-      {/* Bottom Section */}
+      {/* Bottom row */}
       <div className="grid grid-cols-1 gap-6 lg:grid-cols-2 xl:grid-cols-3">
         {/* Top Products */}
         <div className="p-6 bg-white rounded-xl shadow-sm border border-gray-100">
@@ -209,70 +312,26 @@ export default function DashboardContent() {
             <FiPieChart className="mr-2 text-blue-500" /> Top Products
           </h3>
           <ul className="space-y-4">
-            {products.map((p, i) => (
-              <li key={i} className="flex items-center justify-between">
+            {products.map((product, index) => (
+              <li key={index} className="flex items-center justify-between">
                 <div className="flex items-center space-x-3 flex-1">
-                  <div className={`w-3 h-3 ${p.color} rounded-full`} />
+                  <div className={`w-3 h-3 ${product.color} rounded-full`} />
                   <div className="flex-1">
-                    <p className="text-sm font-medium text-gray-700">{p.name}</p>
+                    <p className="text-sm font-medium text-gray-700">{product.name}</p>
                     <div className="w-full h-2 mt-1 bg-gray-200 rounded-full">
-                      <div className={`h-2 ${p.color} rounded-full`} style={{ width: `${p.popularity}%` }} />
+                      <div className={`h-2 ${product.color} rounded-full`} style={{ width: `${product.popularity}%` }} />
                     </div>
                   </div>
                 </div>
-                <span className="text-sm font-medium text-gray-600">{p.sales}</span>
+                <span className="text-sm font-medium text-gray-600">{product.sales}</span>
               </li>
             ))}
           </ul>
         </div>
 
-        {/* Sales by Country */}
-        <div className="p-6 bg-white rounded-xl shadow-sm border border-gray-100">
-          <h3 className="mb-4 font-semibold text-gray-800 flex items-center">
-            <FiMap className="mr-2 text-green-500" /> Sales by Country
-          </h3>
-          <div className="h-48 relative bg-gradient-to-br from-green-50 to-blue-50 rounded-lg flex items-center justify-center">
-            <div className="absolute inset-0 flex items-center justify-center opacity-20">
-              <FiMap className="w-16 h-16 text-gray-400" />
-            </div>
-            <div className="grid grid-cols-2 gap-4 z-10">
-              {[
-                { c: "USA", v: "$42.5k" },
-                { c: "UK",  v: "$28.3k" },
-                { c: "GER", v: "$35.4k" },
-                { c: "JPN", v: "$22.7k" },
-              ].map((x) => (
-                <div key={x.c} className="text-center">
-                  <div className="text-lg font-bold text-gray-800">{x.c}</div>
-                  <div className="text-sm text-gray-600">{x.v}</div>
-                </div>
-              ))}
-            </div>
-          </div>
-        </div>
+        
 
-        {/* Volume vs Service */}
-        <div className="p-6 bg-white rounded-xl shadow-sm border border-gray-100">
-          <h3 className="mb-4 font-semibold text-gray-800 flex items-center">
-            <FiTrendingUp className="mr-2 text-purple-500" /> Volume vs Service
-          </h3>
-          <div className="h-48 flex items-center justify-center">
-            <div className="grid grid-cols-2 gap-4 w-full">
-              <div className="bg-blue-50 p-4 rounded-lg text-center">
-                <div className="text-2xl font-bold text-blue-600">85%</div>
-                <div className="text-xs text-gray-600 mt-1">Service Level</div>
-              </div>
-              <div className="bg-purple-50 p-4 rounded-lg text-center">
-                <div className="text-2xl font-bold text-purple-600">1,284</div>
-                <div className="text-xs text-gray-600 mt-1">Total Volume</div>
-              </div>
-              <div className="col-span-2 bg-gradient-to-r from-blue-500 to-purple-500 p-4 rounded-lg text-white text-center">
-                <div className="text-sm">Efficiency Ratio</div>
-                <div className="text-xl font-bold mt-1">1.24:1</div>
-              </div>
-            </div>
-          </div>
-        </div>
+        
       </div>
     </div>
   );
