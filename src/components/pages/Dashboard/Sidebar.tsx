@@ -2,9 +2,6 @@
 import {
   FaTachometerAlt,
   FaStar,
-  FaShoppingCart,
-  FaBox,
-  FaChartLine,
   FaSignOutAlt,
   FaChevronRight,
   FaTimes,
@@ -22,9 +19,6 @@ const Sidebar = () => {
   const navItems = [
     { icon: <FaTachometerAlt />, text: "Dashboard",   to: "/" },
     { icon: <FaStar />,          text: "Product Management", to: "/ProductManagement" },
-    { icon: <FaShoppingCart />,  text: "Order",       to: "/orders" },
-    { icon: <FaBox />,           text: "Products",    to: "/products" },
-    { icon: <FaChartLine />,     text: "Sales Report",to: "/sales" },
     { icon: <FaSignOutAlt />,    text: "Sign Out",    to: "/signout" },
   ];
 

@@ -177,13 +177,14 @@ export type ProductRow = {
   category: string;    // D
   description: string; // E
   price: string;       // F
+  quantity: string;    // G
 };
 
-// อ่านสินค้าทั้งหมด (A..F)
+// อ่านสินค้าทั้งหมด (A..G)
 export async function getProducts(
   tab = TAB_PRODUCTS
 ): Promise<{ header: string[]; items: ProductRow[] }> {
-  const range = `${tab}!A1:F`;
+  const range = `${tab}!A1:G`; // << ถึง G
   const url = `https://sheets.googleapis.com/v4/spreadsheets/${SHEET_ID}/values/${encodeURIComponent(range)}`;
   const res = await fetchWithAuth(url);
   if (!res.ok) throw new Error(await res.text());
@@ -201,13 +202,14 @@ export async function getProducts(
       category: r[3] ?? "",
       description: r[4] ?? "",
       price: r[5] ?? "",
+      quantity: r[6] ?? "", // << map G
     }))
     .filter((x) => x.id);
 
   return { header, items };
 }
 
-// เพิ่มสินค้า (append) A..F
+// เพิ่มสินค้า (append) A..G
 export async function addProduct(
   p: {
     id: string;
@@ -216,6 +218,7 @@ export async function addProduct(
     category: string;
     description: string;
     price: string | number;
+    quantity: string | number; // << เพิ่ม
   },
   tab = TAB_PRODUCTS
 ) {
@@ -230,6 +233,7 @@ export async function addProduct(
       p.category ?? "",
       p.description ?? "",
       String(p.price ?? ""),
+      String(p.quantity ?? ""), // << G
     ]],
   };
   const res = await fetchWithAuth(url, {
@@ -241,7 +245,7 @@ export async function addProduct(
   return res.json();
 }
 
-// อัปเดตสินค้า (ตาม rowNumber) A..F
+// อัปเดตสินค้า (ตาม rowNumber) A..G
 export async function updateProduct(
   rowNumber: number,
   p: {
@@ -251,10 +255,11 @@ export async function updateProduct(
     category: string;
     description: string;
     price: string | number;
+    quantity: string | number; // << เพิ่ม
   },
   tab = TAB_PRODUCTS
 ) {
-  const range = `${tab}!A${rowNumber}:F${rowNumber}`;
+  const range = `${tab}!A${rowNumber}:G${rowNumber}`; // << ถึง G
   const url = `https://sheets.googleapis.com/v4/spreadsheets/${SHEET_ID}/values/${encodeURIComponent(
     range
   )}?valueInputOption=USER_ENTERED`;
@@ -266,6 +271,7 @@ export async function updateProduct(
       p.category ?? "",
       p.description ?? "",
       String(p.price ?? ""),
+      String(p.quantity ?? ""), // << G
     ]],
   };
   const res = await fetchWithAuth(url, {
@@ -277,9 +283,9 @@ export async function updateProduct(
   return res.json();
 }
 
-// ลบสินค้า (clear) A..F
+// ลบสินค้า (clear) A..G
 export async function deleteProduct(rowNumber: number, tab = TAB_PRODUCTS) {
-  const range = `${tab}!A${rowNumber}:F${rowNumber}`;
+  const range = `${tab}!A${rowNumber}:G${rowNumber}`; // << ถึง G
   const url = `https://sheets.googleapis.com/v4/spreadsheets/${SHEET_ID}/values/${encodeURIComponent(range)}:clear`;
   const res = await fetchWithAuth(url, {
     method: "POST",

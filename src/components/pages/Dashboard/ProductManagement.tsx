@@ -1,6 +1,16 @@
 // src/components/dashboard/ProductManagement.tsx
 import { useMemo, useState } from "react";
-import { FiPlus, FiEdit, FiTrash, FiLink } from "react-icons/fi";
+import {
+  FiPlus,
+  FiEdit,
+  FiTrash,
+  FiLink,
+  FiMenu,
+  FiX,
+  FiHome,
+  FiShoppingBag,
+  FiSettings,
+} from "react-icons/fi";
 
 // ===== Google Sheets helpers =====
 import {
@@ -17,22 +27,23 @@ const CATEGORIES: Category[] = ["Mens", "Womens", "Objects"];
 
 export interface ProductItem {
   rowNumber: number;
-  id: string;          // A
-  imageUrl: string;    // B
-  name: string;        // C
-  // ใช้ string เพื่อให้รับค่าที่มาจากชีตได้ทุกกรณี (กัน header/พิมพ์ผิด)
-  category: string;    // D
-  description: string; // E
-  price: string;       // F
+  id: string;           // A
+  imageUrl: string;     // B
+  name: string;         // C
+  category: string;     // D
+  description: string;  // E
+  price: string;        // F
+  quantity: string;     // G
 }
 
 interface ProductForm {
   id: string;
   imageUrl: string;
   name: string;
-  category: Category | ""; // ว่างได้ระหว่างยังไม่เลือก
+  category: Category | "";
   description: string;
   price: string | number;
+  quantity: string | number;
 }
 
 const initForm: ProductForm = {
@@ -42,9 +53,14 @@ const initForm: ProductForm = {
   category: "",
   description: "",
   price: "",
+  quantity: "",
 };
 
 export default function ProductManagement() {
+  // ===== Sidebar state =====
+  const [sidebarOpen, setSidebarOpen] = useState(false);
+
+  // ===== Sheets + CRUD =====
   const [connected, setConnected] = useState(false);
   const [items, setItems] = useState<ProductItem[]>([]);
   const [form, setForm] = useState<ProductForm>(initForm);
@@ -67,15 +83,15 @@ export default function ProductManagement() {
     setLoading(true);
     try {
       const { items } = await getProducts();
-      // ป้องกันคอลัมน์ไม่ครบ -> fill เป็นสตริงว่าง
       const normalized = (items as any[]).map((r, i) => ({
         rowNumber: r.rowNumber ?? i + 2,
         id: r.id ?? "",
         imageUrl: r.imageUrl ?? "",
         name: r.name ?? "",
-        category: r.category ?? "",       // << สำคัญ
+        category: r.category ?? "",
         description: r.description ?? "",
         price: r.price ?? "",
+        quantity: r.quantity ?? "",
       })) as ProductItem[];
       setItems(normalized);
     } catch (err: unknown) {
@@ -92,14 +108,14 @@ export default function ProductManagement() {
     if (!form.category) return alert("เลือก Category");
     setLoading(true);
     try {
-      // ✅ ประกอบ payload ให้เรียงและมี category แน่นอน
       const payload = {
         id: String(form.id).trim(),
         imageUrl: String(form.imageUrl).trim(),
         name: String(form.name).trim(),
-        category: String(form.category).trim(),      // << ส่งแน่ ๆ
+        category: String(form.category).trim(),
         description: String(form.description).trim(),
         price: String(form.price).trim(),
+        quantity: String(form.quantity).trim(),
       };
 
       if (isEditing && editingRow !== null) {
@@ -125,10 +141,12 @@ export default function ProductManagement() {
       id: item.id ?? "",
       imageUrl: item.imageUrl ?? "",
       name: item.name ?? "",
-      // cast ถ้าค่า category จากชีตไม่ตรงกับสามตัวเลือก จะเซตเป็น "" เพื่อให้เลือกใหม่
-      category: (CATEGORIES as string[]).includes(item.category) ? (item.category as Category) : "",
+      category: (CATEGORIES as string[]).includes(item.category)
+        ? (item.category as Category)
+        : "",
       description: item.description ?? "",
       price: item.price ?? "",
+      quantity: item.quantity ?? "",
     });
     window.scrollTo({ top: 0, behavior: "smooth" });
   };
@@ -147,11 +165,73 @@ export default function ProductManagement() {
     }
   };
 
+  // ===== Sidebar component (inline) =====
+  const Sidebar = () => (
+    <aside
+      className={`fixed inset-y-0 left-0 z-40 w-64 bg-white border-r border-gray-200 shadow-sm transform transition-transform duration-300
+                  ${sidebarOpen ? "translate-x-0" : "-translate-x-full"} lg:translate-x-0`}
+    >
+      <div className="h-16 px-4 flex items-center justify-between border-b">
+        <div className="font-bold text-gray-800">Nn Admin</div>
+        <button
+          className="lg:hidden p-2 rounded hover:bg-gray-100"
+          onClick={() => setSidebarOpen(false)}
+          aria-label="Close sidebar"
+        >
+          <FiX />
+        </button>
+      </div>
+
+      <nav className="p-3 space-y-1">
+        <a
+          href="/"
+          className="flex items-center gap-3 px-3 py-2 rounded-lg hover:bg-gray-100 text-gray-700"
+        >
+          <FiHome /> Dashboard
+        </a>
+        <a
+          href="/ProductManagement"
+          className="flex items-center gap-3 px-3 py-2 rounded-lg bg-blue-50 text-blue-700"
+        >
+          <FiShoppingBag /> Products
+        </a>
+        <a
+          href="#"
+          className="flex items-center gap-3 px-3 py-2 rounded-lg hover:bg-gray-100 text-gray-700"
+        >
+          <FiSettings /> Settings
+        </a>
+      </nav>
+    </aside>
+  );
+
+  // ===== Overlay (mobile) =====
+  const Overlay = () =>
+    sidebarOpen ? (
+      <div
+        className="fixed inset-0 z-30 bg-black/30 lg:hidden"
+        onClick={() => setSidebarOpen(false)}
+      />
+    ) : null;
+
   return (
-    <div className="bg-white rounded-xl shadow-sm border border-gray-100 p-6">
-      <div className="flex flex-col md:flex-row md:items-center md:justify-between gap-3 mb-4">
-        <h2 className="text-xl font-bold text-gray-800">Product Management</h2>
-        <div className="flex gap-2">
+    <div className="min-h-screen bg-gradient-to-br from-gray-50 to-blue-50">
+      {/* Sidebar + overlay */}
+      <Sidebar />
+      <Overlay />
+
+      {/* Top bar */}
+      <header className="h-16 sticky top-0 z-20 bg-white/70 backdrop-blur border-b border-gray-200 flex items-center px-4 lg:pl-72">
+        <button
+          className="p-2 rounded hover:bg-gray-100 lg:hidden"
+          onClick={() => setSidebarOpen(true)}
+          aria-label="Open sidebar"
+        >
+          <FiMenu />
+        </button>
+        <h1 className="text-lg font-semibold text-gray-800 ml-2">Product Management</h1>
+
+        <div className="ml-auto flex gap-2">
           <button
             className="px-3 py-2 rounded-lg border text-sm"
             onClick={connectSheets}
@@ -167,167 +247,187 @@ export default function ProductManagement() {
             ↻ Refresh
           </button>
         </div>
-      </div>
+      </header>
 
-      {/* Form */}
-      <form onSubmit={onSubmit} className="grid grid-cols-1 md:grid-cols-6 gap-3">
-        <input
-          className="border p-2 rounded"
-          placeholder="Product ID"
-          value={form.id}
-          onChange={(e) => setForm({ ...form, id: e.target.value })}
-        />
+      {/* Main content */}
+      <main className="px-4 py-6 lg:pl-72">
+        <div className="bg-white rounded-xl shadow-sm border border-gray-100 p-6">
+          {/* Form */}
+          <form onSubmit={onSubmit} className="grid grid-cols-1 md:grid-cols-7 gap-3">
+            <input
+              className="border p-2 rounded"
+              placeholder="Product ID"
+              value={form.id}
+              onChange={(e) => setForm({ ...form, id: e.target.value })}
+            />
 
-        <div className="md:col-span-2 flex gap-2">
-          <input
-            className="border p-2 rounded flex-1"
-            placeholder="Image URL"
-            value={form.imageUrl}
-            onChange={(e) => setForm({ ...form, imageUrl: e.target.value })}
-          />
-          <a
-            className="px-3 flex items-center gap-1 text-sm underline"
-            href={form.imageUrl || "#"}
-            target="_blank"
-            rel="noreferrer"
-            title="ดูรูป"
-          >
-            <FiLink /> ดูรูป
-          </a>
-        </div>
+            <div className="md:col-span-2 flex gap-2">
+              <input
+                className="border p-2 rounded flex-1"
+                placeholder="Image URL"
+                value={form.imageUrl}
+                onChange={(e) => setForm({ ...form, imageUrl: e.target.value })}
+              />
+              <a
+                className="px-3 flex items-center gap-1 text-sm underline"
+                href={form.imageUrl || "#"}
+                target="_blank"
+                rel="noreferrer"
+                title="ดูรูป"
+              >
+                <FiLink /> ดูรูป
+              </a>
+            </div>
 
-        <input
-          className="border p-2 rounded"
-          placeholder="Name"
-          value={form.name}
-          onChange={(e) => setForm({ ...form, name: e.target.value })}
-        />
+            <input
+              className="border p-2 rounded"
+              placeholder="Name"
+              value={form.name}
+              onChange={(e) => setForm({ ...form, name: e.target.value })}
+            />
 
-        {/* Category dropdown */}
-        <select
-          className="border p-2 rounded"
-          value={form.category}
-          onChange={(e) => setForm({ ...form, category: e.target.value as Category })}
-        >
-          <option value="" disabled>
-            Category
-          </option>
-          {CATEGORIES.map((c) => (
-            <option key={c} value={c}>
-              {c}
-            </option>
-          ))}
-        </select>
-
-        <input
-          className="border p-2 rounded"
-          placeholder="Price"
-          value={form.price}
-          onChange={(e) => setForm({ ...form, price: e.target.value })}
-        />
-
-        <input
-          className="border p-2 rounded md:col-span-6"
-          placeholder="Description"
-          value={form.description}
-          onChange={(e) => setForm({ ...form, description: e.target.value })}
-        />
-
-        <div className="md:col-span-6 flex gap-2">
-          <button
-            className="bg-blue-600 text-white px-4 py-2 rounded disabled:opacity-50"
-            type="submit"
-            disabled={!connected || loading}
-          >
-            {isEditing ? (
-              <>
-                <FiEdit className="inline mr-1" /> Update
-              </>
-            ) : (
-              <>
-                <FiPlus className="inline mr-1" /> Add
-              </>
-            )}
-          </button>
-
-          {isEditing && (
-            <button
-              type="button"
-              className="border px-3 py-2 rounded"
-              onClick={() => {
-                setEditingRow(null);
-                setForm(initForm);
-              }}
+            {/* Category */}
+            <select
+              className="border p-2 rounded"
+              value={form.category}
+              onChange={(e) => setForm({ ...form, category: e.target.value as Category })}
             >
-              Cancel
-            </button>
-          )}
-        </div>
-      </form>
+              <option value="" disabled>
+                Category
+              </option>
+              {CATEGORIES.map((c) => (
+                <option key={c} value={c}>
+                  {c}
+                </option>
+              ))}
+            </select>
 
-      {/* Table */}
-      <div className="mt-6 overflow-x-auto">
-        <table className="min-w-full text-sm">
-          <thead>
-            <tr className="text-left text-gray-600">
-              <th className="py-2 pr-4">ID</th>
-              <th className="py-2 pr-4">Image</th>
-              <th className="py-2 pr-4">Name</th>
-              <th className="py-2 pr-4">Category</th>
-              <th className="py-2 pr-4">Description</th>
-              <th className="py-2 pr-4">Price</th>
-              <th className="py-2 pr-4" />
-            </tr>
-          </thead>
-          <tbody>
-            {items.map((it) => (
-              <tr key={it.rowNumber} className="border-t">
-                <td className="py-2 pr-4 font-mono">{it.id}</td>
-                <td className="py-2 pr-4">
-                  {it.imageUrl ? (
-                    <img
-                      src={it.imageUrl}
-                      alt={it.name}
-                      className="h-10 w-10 object-cover rounded"
-                    />
-                  ) : (
-                    "-"
-                  )}
-                </td>
-                <td className="py-2 pr-4">{it.name}</td>
-                <td className="py-2 pr-4">{it.category}</td>
-                <td className="py-2 pr-4 max-w-[320px] truncate" title={it.description}>
-                  {it.description}
-                </td>
-                <td className="py-2 pr-4">{it.price}</td>
-                <td className="py-2 pr-4">
-                  <div className="flex gap-2">
-                    <button
-                      className="border px-2 py-1 rounded flex items-center gap-1"
-                      onClick={() => onEdit(it.rowNumber, it)}
+            <input
+              className="border p-2 rounded"
+              placeholder="Price"
+              value={form.price}
+              onChange={(e) => setForm({ ...form, price: e.target.value })}
+            />
+
+            <input
+              className="border p-2 rounded"
+              placeholder="Quantity"
+              value={form.quantity}
+              onChange={(e) => setForm({ ...form, quantity: e.target.value })}
+              inputMode="numeric"
+            />
+
+            {/* Description → textarea ให้กด Enter ได้ */}
+            <textarea
+              className="border p-2 rounded md:col-span-7 w-full resize-y"
+              placeholder="Description"
+              rows={4}
+              value={form.description}
+              onChange={(e) => setForm({ ...form, description: e.target.value })}
+            />
+
+            <div className="md:col-span-7 flex gap-2">
+              <button
+                className="bg-blue-600 text-white px-4 py-2 rounded disabled:opacity-50"
+                type="submit"
+                disabled={!connected || loading}
+              >
+                {isEditing ? (
+                  <>
+                    <FiEdit className="inline mr-1" /> Update
+                  </>
+                ) : (
+                  <>
+                    <FiPlus className="inline mr-1" /> Add
+                  </>
+                )}
+              </button>
+
+              {isEditing && (
+                <button
+                  type="button"
+                  className="border px-3 py-2 rounded"
+                  onClick={() => {
+                    setEditingRow(null);
+                    setForm(initForm);
+                  }}
+                >
+                  Cancel
+                </button>
+              )}
+            </div>
+          </form>
+
+          {/* Table */}
+          <div className="mt-6 overflow-x-auto">
+            <table className="min-w-full text-sm">
+              <thead>
+                <tr className="text-left text-gray-600">
+                  <th className="py-2 pr-4">ID</th>
+                  <th className="py-2 pr-4">Image</th>
+                  <th className="py-2 pr-4">Name</th>
+                  <th className="py-2 pr-4">Category</th>
+                  <th className="py-2 pr-4">Description</th>
+                  <th className="py-2 pr-4">Price</th>
+                  <th className="py-2 pr-4">Quantity</th>
+                  <th className="py-2 pr-4" />
+                </tr>
+              </thead>
+              <tbody>
+                {items.map((it) => (
+                  <tr key={it.rowNumber} className="border-t">
+                    <td className="py-2 pr-4 font-mono">{it.id}</td>
+                    <td className="py-2 pr-4">
+                      {it.imageUrl ? (
+                        <img
+                          src={it.imageUrl}
+                          alt={it.name}
+                          className="h-10 w-10 object-cover rounded"
+                        />
+                      ) : (
+                        "-"
+                      )}
+                    </td>
+                    <td className="py-2 pr-4">{it.name}</td>
+                    <td className="py-2 pr-4">{it.category}</td>
+                    <td
+                      className="py-2 pr-4 max-w-[420px] truncate"
+                      title={it.description}
                     >
-                      <FiEdit /> Edit
-                    </button>
-                    <button
-                      className="border px-2 py-1 rounded text-red-600 flex items-center gap-1"
-                      onClick={() => onDelete(it.rowNumber)}
-                    >
-                      <FiTrash /> Delete
-                    </button>
-                  </div>
-                </td>
-              </tr>
-            ))}
-            {items.length === 0 && (
-              <tr>
-                <td className="py-4 text-gray-500" colSpan={7}>
-                  ไม่มีข้อมูล
-                </td>
-              </tr>
-            )}
-          </tbody>
-        </table>
-      </div>
+                      {it.description}
+                    </td>
+                    <td className="py-2 pr-4">{it.price}</td>
+                    <td className="py-2 pr-4">{it.quantity}</td>
+                    <td className="py-2 pr-4">
+                      <div className="flex gap-2">
+                        <button
+                          className="border px-2 py-1 rounded flex items-center gap-1"
+                          onClick={() => onEdit(it.rowNumber, it)}
+                        >
+                          <FiEdit /> Edit
+                        </button>
+                        <button
+                          className="border px-2 py-1 rounded text-red-600 flex items-center gap-1"
+                          onClick={() => onDelete(it.rowNumber)}
+                        >
+                          <FiTrash /> Delete
+                        </button>
+                      </div>
+                    </td>
+                  </tr>
+                ))}
+                {items.length === 0 && (
+                  <tr>
+                    <td className="py-4 text-gray-500" colSpan={8}>
+                      ไม่มีข้อมูล
+                    </td>
+                  </tr>
+                )}
+              </tbody>
+            </table>
+          </div>
+        </div>
+      </main>
     </div>
   );
 }
