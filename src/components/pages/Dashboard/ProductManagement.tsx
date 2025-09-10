@@ -200,7 +200,6 @@ export default function ProductManagement() {
       <div className="flex flex-col md:flex-row md:items-center md:justify-between gap-3">
         <div>
           <h1 className="text-3xl font-bold text-gray-800">Product Management</h1>
-          <p className="text-gray-500">Manage products synced with Google Sheets</p>
         </div>
 
         <div className="flex gap-2">

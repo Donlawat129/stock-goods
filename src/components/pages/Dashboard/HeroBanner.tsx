@@ -250,7 +250,6 @@ export default function HeroBanner() {
       <div className="flex items-center justify-between">
         <div>
           <h1 className="text-3xl font-bold text-gray-800">Banner Hero</h1>
-          <p className="text-gray-500">Manage home page (synced with Google Sheets)</p>
         </div>
 
         <div className="flex items-center gap-2">
