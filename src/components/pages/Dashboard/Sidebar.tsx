@@ -58,7 +58,7 @@ const Sidebar = () => {
           <div className="flex items-center justify-between h-20 border-b border-gray-200 px-4">
             {!isCollapsed && (
               <h1 className="text-2xl font-bold bg-gradient-to-r from-blue-600 to-purple-600 bg-clip-text text-transparent">
-                Dabang
+                Shop
               </h1>
             )}
             <button

@@ -33,7 +33,7 @@ export default function DashBoardNavbar({
       <div className="flex flex-col items-start justify-between space-y-4 md:flex-row md:items-center">
         <div>
           <h1 className="text-3xl font-bold text-gray-800">Dashboard</h1>
-          <p className="text-gray-500">Welcome back, {user.name}! Here's what's happening today.</p>
+          <p className="text-gray-500">Welcome , {user.name} Explore outfits that bring out your confidence.</p>
         </div>
 
         <div className="flex items-center gap-3">
