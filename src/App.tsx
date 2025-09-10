@@ -1,5 +1,7 @@
 import { BrowserRouter, Routes, Route,Navigate } from "react-router-dom";
 
+
+import ScrollToTop from "./components/FrontEnd/ScrollToTop";
 // Auth
 import LoginPage from "./components/pages/LoginPages";
 import RegisterPage from "./components/pages/RegisterPage";
@@ -21,6 +23,7 @@ import ProductManagement from "./components/pages/Dashboard/ProductManagement";
 export default function App() {
   return (
     <BrowserRouter>
+     <ScrollToTop /> 
       <Routes>
         {/* กลุ่มหน้าเว็บฝั่งผู้ใช้ (Front Site) */}
         <Route element={<FrontLayout />}>

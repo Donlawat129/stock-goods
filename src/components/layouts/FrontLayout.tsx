@@ -1,5 +1,6 @@
 import { Outlet } from "react-router-dom";
 import Navbar from "../FrontEnd/Navbar";
+import Footer from './../FrontEnd/Footer';
 
 export default function FrontLayout() {
   return (
@@ -11,6 +12,8 @@ export default function FrontLayout() {
       <main className="min-h-screen">
         <Outlet />
       </main>
+
+      <Footer/>
     </div>
   );
 }

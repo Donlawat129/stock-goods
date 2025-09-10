@@ -20,7 +20,7 @@ const HeroCard: React.FC<HeroCardProps> = ({ title, subtitle, imageUrl, size, li
       
       <div className="relative z-10">
         <h3 className="text-sm font-light uppercase tracking-widest">{subtitle}</h3>
-        <h2 className={`font-bold mt-1 mb-4 ${isLarge ? 'text-4xl' : 'text-2xl'}`}>{title}</h2>
+        <h2 className={`font-bold mt-1 mb-4 ${isLarge ? 'text-2xl' : 'text-xl'}`}>{title}</h2>
         <a href={linkUrl}>
           <button className="bg-white text-black px-6 py-2 rounded-full font-semibold text-sm transition-colors duration-200 hover:bg-gray-200">
             Shop Now
