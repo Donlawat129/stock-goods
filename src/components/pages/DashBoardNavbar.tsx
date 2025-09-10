@@ -40,9 +40,7 @@ export default function DashBoardNavbar({
       <div className="flex flex-col items-start justify-between space-y-4 md:flex-row md:items-center">
         <div>
           <h1 className="text-3xl font-bold text-gray-800">Dashboard</h1>
-          <p className="text-gray-500">
-            Welcome , {user.name}
-          </p>
+          
         </div>
 
         {showControls && (
