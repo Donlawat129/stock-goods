@@ -1,26 +1,47 @@
 // src/lib/auth.ts
 import { readUsers, appendUserRow, findUserByEmailPassword } from "./sheetsClient";
 
-// ฟังก์ชัน Register (แค่สร้าง user ใหม่)
+export type AuthUser = { uid: string; email: string; name?: string };
+
+const AUTH_KEY = "auth_user";
+
+// ===== session helpers =====
+export function setSessionUser(u: AuthUser | null) {
+  if (u) localStorage.setItem(AUTH_KEY, JSON.stringify(u));
+  else localStorage.removeItem(AUTH_KEY);
+}
+export function getSessionUser(): AuthUser | null {
+  try {
+    const raw = localStorage.getItem(AUTH_KEY);
+    return raw ? (JSON.parse(raw) as AuthUser) : null;
+  } catch {
+    return null;
+  }
+}
+export function logout() {
+  setSessionUser(null);
+}
+
+// ===== Register (เพิ่ม user ใหม่) =====
 export async function registerUser(email: string, password: string) {
-  // 1. อ่าน Users ทั้งหมด
   const { rows } = await readUsers();
   const exists = rows.some((r) => r[1] === email);
   if (exists) throw new Error("Email already registered");
 
-  // 2. สร้าง UID (ง่ายๆ ใช้ timestamp + random)
   const uid = `uid_${Date.now()}_${Math.floor(Math.random() * 1000)}`;
-
-  // 3. เพิ่ม User ลง Sheet
   await appendUserRow(uid, email, password);
-
-  // 4. Return message แค่แจ้งว่า register สำเร็จ
   return { message: "Register successful. Please login." };
 }
 
-// ฟังก์ชัน Login
+// ===== Login (บันทึก session ให้ด้วย) =====
 export async function login(email: string, password: string) {
   const user = await findUserByEmailPassword(email, password);
   if (!user) throw new Error("Invalid email or password");
-  return user;
+
+  // ไม่มีคอลัมน์ name ในชีต เลยเดาชื่อจากอีเมลก่อน @
+  const nameGuess = email.split("@")[0];
+  const sessionUser: AuthUser = { uid: user.uid, email: user.email, name: nameGuess };
+
+  setSessionUser(sessionUser); // << เก็บไว้ให้ Sidebar ใช้
+  return sessionUser;
 }

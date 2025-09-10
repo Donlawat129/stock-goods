@@ -1,6 +1,7 @@
-// src/components/Sidebar.jsx
-import { useState } from "react";
-import { NavLink } from "react-router-dom";
+// src/components/pages/Dashboard/Sidebar.tsx
+import { useEffect, useState } from "react";
+import type { ReactNode } from "react";
+import { NavLink, useNavigate } from "react-router-dom";
 import {
   FaTachometerAlt,
   FaBox,
@@ -10,20 +11,37 @@ import {
   FaBars,
 } from "react-icons/fa";
 
+import type { AuthUser } from "../../../lib/auth";
+import { getSessionUser, logout } from "../../../lib/auth";
+
 const Sidebar = () => {
   const [isCollapsed, setIsCollapsed] = useState(false);
   const [isMobileOpen, setIsMobileOpen] = useState(false);
+  const [user, setUser] = useState<AuthUser | null>(null);
+  const navigate = useNavigate();
 
-  // แก้ path ให้ตรงกับ route ของโปรเจกต์คุณได้ตามต้องการ
-  const navItems = [
-    { icon: <FaTachometerAlt />, text: "Dashboard",           to: "/Dashboard" },
-    { icon: <FaBox />,           text: "Product Management",  to: "/Dashboard/ProductManagement" },
-    { icon: <FaSignOutAlt />,    text: "Sign Out",            to: "/logout" }, // หรือหน้า login ของคุณ
+  useEffect(() => {
+    setUser(getSessionUser());
+  }, []);
+
+  const displayName =
+    user?.name ?? (user?.email ? user.email.split("@")[0] : "User Name");
+  const displayEmail = user?.email ?? "admin@dabang.com";
+
+  // ✅ เปลี่ยน JSX.Element → ReactNode
+  const navItems: { icon: ReactNode; text: string; to: string }[] = [
+    { icon: <FaTachometerAlt />, text: "Dashboard",          to: "/Dashboard" },
+    { icon: <FaBox />,           text: "Product Management", to: "/Dashboard/ProductManagement" },
   ];
 
   const toggleSidebar = () => setIsCollapsed((v) => !v);
   const toggleMobileSidebar = () => setIsMobileOpen((v) => !v);
   const closeMobile = () => setIsMobileOpen(false);
+
+  const onSignOut = () => {
+    logout();
+    navigate("/login"); // ปรับ path ตามโปรเจกต์
+  };
 
   return (
     <>
@@ -35,12 +53,9 @@ const Sidebar = () => {
         {isMobileOpen ? <FaTimes /> : <FaBars />}
       </button>
 
-      {/* Overlay for mobile */}
+      {/* Overlay */}
       {isMobileOpen && (
-        <div
-          className="fixed inset-0 bg-black bg-opacity-50 z-40 lg:hidden"
-          onClick={closeMobile}
-        />
+        <div className="fixed inset-0 bg-black bg-opacity-50 z-40 lg:hidden" onClick={closeMobile} />
       )}
 
       {/* Sidebar */}
@@ -54,22 +69,18 @@ const Sidebar = () => {
             isCollapsed ? "w-20" : "w-64"
           } transition-all duration-300`}
         >
-          {/* Logo Section */}
+          {/* Logo */}
           <div className="flex items-center justify-between h-20 border-b border-gray-200 px-4">
             {!isCollapsed && (
               <h1 className="text-2xl font-bold bg-gradient-to-r from-blue-600 to-purple-600 bg-clip-text text-transparent">
-                Shop
+                Dabang
               </h1>
             )}
             <button
               onClick={toggleSidebar}
               className="p-2 rounded-full hover:bg-blue-100 transition-colors duration-200 hidden lg:block"
             >
-              <FaChevronRight
-                className={`transform transition-transform ${
-                  isCollapsed ? "rotate-180" : ""
-                }`}
-              />
+              <FaChevronRight className={`transform transition-transform ${isCollapsed ? "rotate-180" : ""}`} />
             </button>
           </div>
 
@@ -91,29 +102,18 @@ const Sidebar = () => {
               >
                 {({ isActive }) => (
                   <>
-                    {/* แถบ active ซ้าย (เฉพาะตอนขยาย) */}
                     {isActive && !isCollapsed && (
                       <div className="absolute left-0 w-1 h-8 bg-white rounded-r-full" />
                     )}
-
-                    <div className={`${isCollapsed ? "" : "mr-3"} relative`}>
-                      <div
-                        className={`text-lg ${
-                          isActive ? "text-white" : "text-gray-500 group-hover:text-blue-600"
-                        }`}
-                      >
-                        {item.icon}
-                      </div>
+                    <div className={`${isCollapsed ? "" : "mr-3"} text-lg`}>
+                      {item.icon}
                     </div>
-
                     {!isCollapsed && (
                       <>
                         <span className="font-medium flex-1 truncate">{item.text}</span>
                         {isActive && <FaChevronRight className="text-sm opacity-70" />}
                       </>
                     )}
-
-                    {/* Tooltip ตอนย่อแถบ */}
                     {isCollapsed && (
                       <div className="absolute left-full ml-3 px-2 py-1 bg-gray-900 text-white text-sm rounded-md opacity-0 group-hover:opacity-100 transition-opacity duration-200 whitespace-nowrap">
                         {item.text}
@@ -123,18 +123,33 @@ const Sidebar = () => {
                 )}
               </NavLink>
             ))}
+
+            {/* Sign Out */}
+            <button
+              onClick={onSignOut}
+              className={`w-full text-left flex items-center p-3 rounded-xl transition-all duration-200 group relative overflow-hidden ${
+                "text-gray-600 hover:bg-blue-100 hover:text-blue-600"
+              } ${isCollapsed ? "justify-center" : ""}`}
+            >
+              <div className={`${isCollapsed ? "" : "mr-3"} text-lg`}>
+                <FaSignOutAlt />
+              </div>
+              {!isCollapsed && <span className="font-medium flex-1">Sign Out</span>}
+            </button>
           </nav>
 
-          {/* User Profile Section */}
+          {/* User Profile */}
           {!isCollapsed && (
             <div className="p-4 border-t border-gray-200">
               <div className="flex items-center space-x-3">
-                <div className="h-10 w-10 rounded-full bg-gradient-to-r from-blue-400 to-purple-400 flex items-center justify-center text-white font-bold">
-                  U
-                </div>
+                <img
+                  src={"https://api.dicebear.com/7.x/initials/svg?seed=" + encodeURIComponent(displayName)}
+                  alt={displayName}
+                  className="h-10 w-10 rounded-full ring-1 ring-gray-200"
+                />
                 <div className="flex-1 min-w-0">
-                  <p className="text-sm font-medium text-gray-900 truncate">User Name</p>
-                  <p className="text-xs text-gray-500 truncate">admin@dabang.com</p>
+                  <p className="text-sm font-medium text-gray-900 truncate">{displayName}</p>
+                  <p className="text-xs text-gray-500 truncate">{displayEmail}</p>
                 </div>
               </div>
             </div>
