@@ -1,11 +1,12 @@
 // lib/sheetsClient.ts
 
 // ===== Env =====
-const CLIENT_ID   = import.meta.env.VITE_GOOGLE_CLIENT_ID as string;
-const SHEET_ID    = import.meta.env.VITE_SHEET_ID as string;
-const SHEET_TAB   = (import.meta.env.VITE_SHEET_TAB as string) || "Users";      // สำหรับ Users
+const CLIENT_ID = import.meta.env.VITE_GOOGLE_CLIENT_ID as string;
+const SHEET_ID = import.meta.env.VITE_SHEET_ID as string;
+const SHEET_TAB = (import.meta.env.VITE_SHEET_TAB as string) || "Users"; // สำหรับ Users
 const TAB_PRODUCTS = (import.meta.env.VITE_SHEET_TAB_PRODUCTS as string) || "Products";
 
+// แค่ scope spreadsheets ก็พอสำหรับอ่าน/เขียนชีต
 const SCOPES = "https://www.googleapis.com/auth/spreadsheets";
 
 // ===== Token Storage Keys =====
@@ -16,9 +17,7 @@ const TOKEN_EXP_KEY = "sheets_token_exp"; // epoch ms
 let accessToken: string | null = null;
 
 // ---------- Utilities ----------
-function now() {
-  return Date.now();
-}
+const now = () => Date.now();
 
 function getStoredToken() {
   const t = localStorage.getItem(TOKEN_KEY);
@@ -36,19 +35,40 @@ function saveToken(token: string, expiresInSec?: number) {
 }
 
 function assertToken() {
+  // พยายามกู้จาก localStorage ถ้ายังไม่มีในหน่วยความจำ
+  if (!accessToken) accessToken = getStoredToken();
   if (!accessToken) throw new Error("No OAuth token. Call requestSheetsToken() first.");
   return accessToken;
 }
 
+// โหลด GSI อัตโนมัติถ้ายังไม่มี <script>
 function ensureGisLoaded(): Promise<void> {
-  return new Promise((resolve) => {
-    if ((window as any).google?.accounts?.oauth2) return resolve();
-    const iv = setInterval(() => {
-      if ((window as any).google?.accounts?.oauth2) {
-        clearInterval(iv);
-        resolve();
-      }
-    }, 50);
+  return new Promise((resolve, reject) => {
+    const ok = () => !!(window as any).google?.accounts?.oauth2;
+
+    // มีอยู่แล้ว
+    if (ok()) return resolve();
+
+    // ถ้ามีแท็กแล้วรอให้โหลดเสร็จ
+    const existing = document.querySelector<HTMLScriptElement>('script[src*="accounts.google.com/gsi/client"]');
+    if (existing) {
+      const iv = setInterval(() => {
+        if (ok()) {
+          clearInterval(iv);
+          resolve();
+        }
+      }, 50);
+      return;
+    }
+
+    // สร้างแท็ก script ใหม่
+    const s = document.createElement("script");
+    s.src = "https://accounts.google.com/gsi/client";
+    s.async = true;
+    s.defer = true;
+    s.onload = () => resolve();
+    s.onerror = () => reject(new Error("Failed to load Google Identity Services"));
+    document.head.appendChild(s);
   });
 }
 
@@ -88,11 +108,18 @@ export async function requestSheetsToken(
   });
 }
 
-/** เรียกสั้น ๆ: ให้มี token พร้อมใช้ (ถ้าไม่มีจะ popup ขอใหม่) */
+/** ให้มี token พร้อมใช้: พยายาม silent ก่อน ถ้าไม่ได้ค่อย consent */
 export async function ensureToken() {
+  // พยายามโหลด token จาก storage
   accessToken = getStoredToken();
-  if (!accessToken) {
-    await requestSheetsToken("consent");
+  if (accessToken) return accessToken;
+
+  // silent ก่อน
+  try {
+    return await requestSheetsToken("none");
+  } catch {
+    // ถ้าไม่ได้ ค่อย popup
+    return await requestSheetsToken("consent");
   }
 }
 
@@ -103,11 +130,28 @@ export function clearSheetsToken() {
   localStorage.removeItem(TOKEN_EXP_KEY);
 }
 
+/** helper สำหรับ debug UI */
+export function getAuthInfo() {
+  return {
+    hasMemoryToken: !!accessToken,
+    hasStoredToken: !!getStoredToken(),
+    expAt: Number(localStorage.getItem(TOKEN_EXP_KEY) || 0),
+  };
+}
+
 // ---------- Fetch helper (auto refresh on 401) ----------
 async function fetchWithAuth(url: string, init: RequestInit = {}, retry = true): Promise<Response> {
-  const token = assertToken();
+  // ถ้ายังไม่มี token ให้ลอง silent ก่อนยิงครั้งแรก
+  if (!accessToken) {
+    try {
+      await requestSheetsToken("none");
+    } catch {
+      // เงียบไว้ รอผู้ใช้กด connect หรือให้ไป fail ที่ assert ด้านล่าง
+    }
+  }
+
   const headers = new Headers(init.headers || {});
-  headers.set("Authorization", `Bearer ${token}`);
+  headers.set("Authorization", `Bearer ${assertToken()}`);
 
   const res = await fetch(url, { ...init, headers });
   if (res.status !== 401 || !retry) return res;
@@ -184,7 +228,7 @@ export type ProductRow = {
 export async function getProducts(
   tab = TAB_PRODUCTS
 ): Promise<{ header: string[]; items: ProductRow[] }> {
-  const range = `${tab}!A1:G`; // << ถึง G
+  const range = `${tab}!A1:G`;
   const url = `https://sheets.googleapis.com/v4/spreadsheets/${SHEET_ID}/values/${encodeURIComponent(range)}`;
   const res = await fetchWithAuth(url);
   if (!res.ok) throw new Error(await res.text());
@@ -202,7 +246,7 @@ export async function getProducts(
       category: r[3] ?? "",
       description: r[4] ?? "",
       price: r[5] ?? "",
-      quantity: r[6] ?? "", // << map G
+      quantity: r[6] ?? "",
     }))
     .filter((x) => x.id);
 
@@ -218,7 +262,7 @@ export async function addProduct(
     category: string;
     description: string;
     price: string | number;
-    quantity: string | number; // << เพิ่ม
+    quantity: string | number;
   },
   tab = TAB_PRODUCTS
 ) {
@@ -233,7 +277,7 @@ export async function addProduct(
       p.category ?? "",
       p.description ?? "",
       String(p.price ?? ""),
-      String(p.quantity ?? ""), // << G
+      String(p.quantity ?? ""),
     ]],
   };
   const res = await fetchWithAuth(url, {
@@ -255,11 +299,11 @@ export async function updateProduct(
     category: string;
     description: string;
     price: string | number;
-    quantity: string | number; // << เพิ่ม
+    quantity: string | number;
   },
   tab = TAB_PRODUCTS
 ) {
-  const range = `${tab}!A${rowNumber}:G${rowNumber}`; // << ถึง G
+  const range = `${tab}!A${rowNumber}:G${rowNumber}`;
   const url = `https://sheets.googleapis.com/v4/spreadsheets/${SHEET_ID}/values/${encodeURIComponent(
     range
   )}?valueInputOption=USER_ENTERED`;
@@ -271,7 +315,7 @@ export async function updateProduct(
       p.category ?? "",
       p.description ?? "",
       String(p.price ?? ""),
-      String(p.quantity ?? ""), // << G
+      String(p.quantity ?? ""),
     ]],
   };
   const res = await fetchWithAuth(url, {
@@ -285,7 +329,7 @@ export async function updateProduct(
 
 // ลบสินค้า (clear) A..G
 export async function deleteProduct(rowNumber: number, tab = TAB_PRODUCTS) {
-  const range = `${tab}!A${rowNumber}:G${rowNumber}`; // << ถึง G
+  const range = `${tab}!A${rowNumber}:G${rowNumber}`;
   const url = `https://sheets.googleapis.com/v4/spreadsheets/${SHEET_ID}/values/${encodeURIComponent(range)}:clear`;
   const res = await fetchWithAuth(url, {
     method: "POST",
