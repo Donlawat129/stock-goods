@@ -14,7 +14,6 @@ import {
 
 import {
   requestSheetsToken,
-  ensureToken,            // <-- เพิ่ม
   getHeroBanners,
   addHeroBanner,
   updateHeroBanner,
@@ -24,25 +23,24 @@ import {
   type BannerRow,
 } from "../../../lib/sheetsClient";
 
-type ButtonType = "Mens" | "Womens" | "Objects";
-const BTN_TYPES: ButtonType[] = ["Mens", "Womens", "Objects"];
-
+// ===== ฟอร์มใช้ตามสคีม่าใหม่ในชีต =====
+// (Title, Subtitle, Desc, Image, Color, ButtonColor) และเก็บ autoplay ที่ H2
 type BannerForm = {
-  id: string;
-  imageUrl: string;
   title: string;
   subtitle: string;
-  buttonText: string;
-  buttonType: ButtonType | "";
+  desc: string;
+  image: string;
+  color: string;
+  buttonColor: string;
 };
 
 const emptyForm: BannerForm = {
-  id: "",
-  imageUrl: "",
   title: "",
   subtitle: "",
-  buttonText: "",
-  buttonType: "",
+  desc: "",
+  image: "",
+  color: "",
+  buttonColor: "",
 };
 
 const LS_AUTOPLAY = "hero_autoplay_ms";
@@ -52,15 +50,22 @@ const Card: React.FC<{ children: React.ReactNode; className?: string }> = ({
   children,
   className = "",
 }) => (
-  <div className={"bg-white rounded-2xl shadow-sm border border-gray-200/60 " + className}>
+  <div
+    className={
+      "bg-white rounded-2xl shadow-sm border border-gray-200/60 " + className
+    }
+  >
     {children}
   </div>
 );
 
 const PillButton: React.FC<
-  React.ButtonHTMLAttributes<HTMLButtonElement> & { variant?: "primary" | "ghost" | "danger" }
+  React.ButtonHTMLAttributes<HTMLButtonElement> & {
+    variant?: "primary" | "ghost" | "danger";
+  }
 > = ({ children, className = "", variant = "ghost", ...rest }) => {
-  const base = "inline-flex items-center gap-2 rounded-xl px-4 py-2 text-sm transition shadow-sm";
+  const base =
+    "inline-flex items-center gap-2 rounded-xl px-4 py-2 text-sm transition shadow-sm";
   const styles =
     variant === "primary"
       ? "bg-gradient-to-r from-indigo-500 to-violet-500 text-white hover:opacity-95"
@@ -76,12 +81,12 @@ const PillButton: React.FC<
 
 function toPayload(f: BannerForm) {
   return {
-    id: (f.id || `bn_${Date.now()}_${Math.floor(Math.random() * 9999)}`).trim(),
-    imageUrl: f.imageUrl.trim(),
     title: f.title.trim(),
     subtitle: f.subtitle.trim(),
-    buttonText: f.buttonText.trim(),
-    buttonType: (f.buttonType || "").toString(),
+    desc: f.desc.trim(),
+    image: f.image.trim(),
+    color: f.color.trim(),
+    buttonColor: f.buttonColor.trim(),
   };
 }
 
@@ -92,7 +97,7 @@ export default function HeroBanner() {
 
   // Data
   const [items, setItems] = useState<BannerRow[]>([]);
-  const [intervalMs, setIntervalMs] = useState<number>(5000);
+  const [intervalMs, setIntervalMs] = useState<number>(10000);
 
   // Quick Add
   const [quick, setQuick] = useState<BannerForm>(emptyForm);
@@ -105,36 +110,21 @@ export default function HeroBanner() {
   // Toast
   const [toast, setToast] = useState<string>("");
 
-  // ดีบาวน์ตัวจับเวลาเซฟอัตโนมัติ
+  // ดีบาวน์เซฟอัตโนมัติ
   const saveTimer = useRef<number | null>(null);
 
-  /* --------- initial: โหลดค่า autoplay จาก localStorage ---------- */
+  /* initial */
   useEffect(() => {
-    const v = Number(localStorage.getItem(LS_AUTOPLAY) || "5000");
+    const v = Number(localStorage.getItem(LS_AUTOPLAY) || "10000");
     if (!Number.isNaN(v)) setIntervalMs(v);
     return () => {
       if (saveTimer.current) window.clearTimeout(saveTimer.current);
     };
   }, []);
 
-  /* --------- AUTO-CONNECT (silent) เมื่อหน้าโหลด ---------- */
-  useEffect(() => {
-    (async () => {
-      try {
-        await ensureToken();     // ถ้าเคยอนุญาตไว้จะผ่านแบบเงียบ
-        setConnected(true);
-        await refresh(true);     // force โหลดครั้งแรกเลย
-      } catch {
-        // เงียบไว้ → ผู้ใช้ใหม่ยังต้องกด Connect ครั้งแรก
-      }
-    })();
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, []);
-
-  /* --------- persist autoplay (Sheets ถ้า connected + localStorage เสมอ) ---------- */
   async function persistAutoplay(ms: number) {
     try {
-      if (connected) await setHeroIntervalMs(ms);
+      if (connected) await setHeroIntervalMs(ms); // เขียนที่ H2
       localStorage.setItem(LS_AUTOPLAY, String(ms));
       setToast("Saved autoplay");
     } catch (e) {
@@ -145,7 +135,6 @@ export default function HeroBanner() {
     }
   }
 
-  /* --------- AUTO-SAVE: เซฟอัตโนมัติทุกครั้งที่ intervalMs เปลี่ยน (หน่วง 300ms) ---------- */
   useEffect(() => {
     if (saveTimer.current) window.clearTimeout(saveTimer.current);
     saveTimer.current = window.setTimeout(() => {
@@ -156,23 +145,25 @@ export default function HeroBanner() {
     };
   }, [intervalMs]);
 
-  /* --------- Sheets actions ---------- */
+  /* Sheets actions */
   const connectSheets = async () => {
     try {
       await requestSheetsToken();
       setConnected(true);
-      await refresh(true);
+      // อ่านทันที ไม่รอ state connected
+      await doRefresh();
     } catch (e: any) {
       alert(e?.message || "เชื่อม Google Sheets ไม่สำเร็จ");
     }
   };
 
-  // เพิ่ม force เพื่อใช้หลัง setConnected(true) ในเฟรมเดียวกัน
-  const refresh = async (force = false) => {
-    if (!connected && !force) return;
+  const doRefresh = async () => {
     setLoading(true);
     try {
-      const [{ items }, ms] = await Promise.all([getHeroBanners(), getHeroIntervalMs()]);
+      const [{ items }, ms] = await Promise.all([
+        getHeroBanners(),
+        getHeroIntervalMs(),
+      ]);
       setItems(items);
       setIntervalMs(ms);
       localStorage.setItem(LS_AUTOPLAY, String(ms));
@@ -183,11 +174,15 @@ export default function HeroBanner() {
     }
   };
 
+  const refresh = async () => {
+    if (!connected) return;
+    await doRefresh();
+  };
+
   async function addQuick(e: React.FormEvent) {
     e.preventDefault();
     if (!connected) return alert("กรุณา Connect Google Sheets ก่อน");
     if (!quick.title.trim()) return alert("กรอก Title");
-    if (!quick.buttonText.trim()) return alert("กรอก Button Text");
 
     try {
       await addHeroBanner(toPayload(quick));
@@ -200,25 +195,22 @@ export default function HeroBanner() {
     }
   }
 
-  /* --------- Inline Edit ---------- */
+  /* Inline Edit */
   function startEdit(b: BannerRow) {
     setEditingRow(b.rowNumber);
     setEditForm({
-      id: b.id,
-      imageUrl: b.imageUrl,
       title: b.title,
       subtitle: b.subtitle,
-      buttonText: b.buttonText,
-      buttonType: (BTN_TYPES as readonly string[]).includes(b.buttonType)
-        ? (b.buttonType as ButtonType)
-        : "",
+      desc: b.desc,
+      image: b.image,
+      color: b.color,
+      buttonColor: b.buttonColor,
     });
   }
 
   async function saveEdit(rowNumber: number) {
     if (!connected) return alert("กรุณา Connect Google Sheets ก่อน");
     if (!editForm.title.trim()) return alert("กรอก Title");
-    if (!editForm.buttonText.trim()) return alert("กรอก Button Text");
     try {
       await updateHeroBanner(rowNumber, toPayload(editForm));
       setEditingRow(null);
@@ -250,19 +242,16 @@ export default function HeroBanner() {
       <div className="flex items-center justify-between">
         <div>
           <h1 className="text-3xl font-bold text-gray-800">Banner Hero</h1>
+          <p className="text-gray-500">
+            Manage home page (synced with Google Sheets)
+          </p>
         </div>
 
         <div className="flex items-center gap-2">
-          {!connected ? (
-            <PillButton onClick={connectSheets}>
-              <FiCloud /> Connect Google Sheets
-            </PillButton>
-          ) : (
-            <span className="inline-flex items-center gap-2 rounded-xl border border-green-200 bg-green-50 px-4 py-2 text-sm text-green-700">
-              <FiCloud /> Connected
-            </span>
-          )}
-          <PillButton onClick={() => refresh()} disabled={!connected || loading}>
+          <PillButton onClick={connectSheets}>
+            <FiCloud /> {connected ? "Connected" : "Connect Google Sheets"}
+          </PillButton>
+          <PillButton onClick={refresh} disabled={!connected || loading}>
             <FiRefreshCw /> Refresh
           </PillButton>
         </div>
@@ -281,45 +270,54 @@ export default function HeroBanner() {
               step={1}
               className="w-32 rounded-xl border border-gray-300/70 bg-white px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-indigo-400/60 focus:border-transparent"
               value={intervalMs}
-              onChange={(e) => setIntervalMs(Math.max(0, Number(e.target.value) || 0))}
+              onChange={(e) =>
+                setIntervalMs(Math.max(0, Number(e.target.value) || 0))
+              }
               disabled={!connected}
             />
-            <PillButton variant="primary" onClick={() => persistAutoplay(intervalMs)} disabled={!connected}>
+            <PillButton
+              variant="primary"
+              onClick={() => persistAutoplay(intervalMs)}
+              disabled={!connected}
+            >
               <FiSave /> บันทึก
             </PillButton>
           </label>
 
-          <div className="flex items-center gap-2">
-            <div className="text-gray-500">
-              จำนวนแบนเนอร์: <span className="font-semibold">{items.length}</span>
-            </div>
+          <div className="text-gray-500">
+            จำนวนแบนเนอร์: <span className="font-semibold">{items.length}</span>
           </div>
         </div>
       </Card>
 
-      {/* Quick Add */}
+      {/* Quick Add: ฟิลด์ตามคอลัมน์ใหม่ */}
       <Card>
-        <form onSubmit={addQuick} className="p-4 grid grid-cols-1 md:grid-cols-12 gap-3">
+        <form
+          onSubmit={addQuick}
+          className="p-4 grid grid-cols-1 md:grid-cols-12 gap-3"
+        >
+          {/* Image */}
           <div className="md:col-span-4">
-            <label className="block text-xs text-gray-500 mb-1">Image URL</label>
+            <label className="block text-xs text-gray-500 mb-1">Image (URL)</label>
             <input
               ref={quickImageRef}
               className="w-full rounded-xl border border-gray-300/70 bg-white px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-indigo-400/60 focus:border-transparent"
               placeholder="https://..."
-              value={quick.imageUrl}
-              onChange={(e) => setQuick({ ...quick, imageUrl: e.target.value })}
+              value={quick.image}
+              onChange={(e) => setQuick({ ...quick, image: e.target.value })}
               disabled={!connected}
             />
             <div className="mt-2 h-12 w-12 rounded-md ring-1 ring-gray-200 overflow-hidden flex items-center justify-center bg-gray-50">
-              {quick.imageUrl ? (
-                <img src={quick.imageUrl} className="h-full w-full object-cover" />
+              {quick.image ? (
+                <img src={quick.image} className="h-full w-full object-cover" />
               ) : (
                 <FiImage className="text-gray-400" />
               )}
             </div>
           </div>
 
-          <div className="md:col-span-3">
+          {/* Title */}
+          <div className="md:col-span-4">
             <label className="block text-xs text-gray-500 mb-1">Title</label>
             <input
               className="w-full rounded-xl border border-gray-300/70 bg-white px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-indigo-400/60 focus:border-transparent"
@@ -329,40 +327,73 @@ export default function HeroBanner() {
             />
           </div>
 
-          <div className="md:col-span-2">
-            <label className="block text-xs text-gray-500 mb-1">Button Text</label>
+          {/* Subtitle */}
+          <div className="md:col-span-4">
+            <label className="block text-xs text-gray-500 mb-1">Subtitle</label>
             <input
               className="w-full rounded-xl border border-gray-300/70 bg-white px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-indigo-400/60 focus:border-transparent"
-              value={quick.buttonText}
-              onChange={(e) => setQuick({ ...quick, buttonText: e.target.value })}
-              disabled={!connected}
-            />
-          </div>
-
-          <div className="md:col-span-3">
-            <label className="block text-xs text-gray-500 mb-1">Type</label>
-            <select
-              className="w-full rounded-xl border border-gray-300/70 bg-white px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-indigo-400/60 focus:border-transparent"
-              value={quick.buttonType}
-              onChange={(e) => setQuick({ ...quick, buttonType: e.target.value as ButtonType })}
-              disabled={!connected}
-            >
-              <option value="" disabled>เลือกหมวด</option>
-              {BTN_TYPES.map((t) => (
-                <option key={t} value={t}>{t}</option>
-              ))}
-            </select>
-          </div>
-
-          <div className="md:col-span-12">
-            <label className="block text-xs text-gray-500 mb-1">Subtitle</label>
-            <textarea
-              rows={3}
-              className="w-full rounded-xl border border-gray-300/70 bg-white px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-indigo-400/60 focus:border-transparent resize-y"
               value={quick.subtitle}
               onChange={(e) => setQuick({ ...quick, subtitle: e.target.value })}
               disabled={!connected}
             />
+          </div>
+
+          {/* Desc */}
+          <div className="md:col-span-6">
+            <label className="block text-xs text-gray-500 mb-1">Desc</label>
+            <textarea
+              rows={3}
+              className="w-full rounded-xl border border-gray-300/70 bg-white px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-indigo-400/60 focus:border-transparent resize-y"
+              value={quick.desc}
+              onChange={(e) => setQuick({ ...quick, desc: e.target.value })}
+              disabled={!connected}
+            />
+          </div>
+
+          {/* Color */}
+          <div className="md:col-span-3">
+            <label className="block text-xs text-gray-500 mb-1">Color</label>
+            <div className="flex items-center gap-2">
+              <input
+                type="color"
+                className="h-10 w-12 rounded-md border border-gray-300/70"
+                value={quick.color || "#000000"}
+                onChange={(e) => setQuick({ ...quick, color: e.target.value })}
+                disabled={!connected}
+              />
+              <input
+                className="flex-1 rounded-xl border border-gray-300/70 bg-white px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-indigo-400/60 focus:border-transparent"
+                placeholder="#RRGGBB"
+                value={quick.color}
+                onChange={(e) => setQuick({ ...quick, color: e.target.value })}
+                disabled={!connected}
+              />
+            </div>
+          </div>
+
+          {/* ButtonColor */}
+          <div className="md:col-span-3">
+            <label className="block text-xs text-gray-500 mb-1">ButtonColor</label>
+            <div className="flex items-center gap-2">
+              <input
+                type="color"
+                className="h-10 w-12 rounded-md border border-gray-300/70"
+                value={quick.buttonColor || "#000000"}
+                onChange={(e) =>
+                  setQuick({ ...quick, buttonColor: e.target.value })
+                }
+                disabled={!connected}
+              />
+              <input
+                className="flex-1 rounded-xl border border-gray-300/70 bg-white px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-indigo-400/60 focus:border-transparent"
+                placeholder="#RRGGBB"
+                value={quick.buttonColor}
+                onChange={(e) =>
+                  setQuick({ ...quick, buttonColor: e.target.value })
+                }
+                disabled={!connected}
+              />
+            </div>
           </div>
 
           <div className="md:col-span-12">
@@ -373,21 +404,36 @@ export default function HeroBanner() {
         </form>
       </Card>
 
+
       {/* Table */}
       <Card>
         <div className="p-4 overflow-x-auto">
           <table className="min-w-full text-sm">
             <thead>
               <tr className="text-left text-gray-600">
-                {["No", "Image", "Title", "Subtitle", "Button Text", "Type Of Button", "Actions"].map((h) => (
-                  <th key={h} className="py-2 pr-4 font-medium whitespace-nowrap">{h}</th>
+                {[
+                  "No",
+                  "Image",
+                  "Title",
+                  "Subtitle",
+                  "Desc",
+                  "Color",
+                  "ButtonColor",
+                  "Actions",
+                ].map((h) => (
+                  <th
+                    key={h}
+                    className="py-2 pr-4 font-medium whitespace-nowrap"
+                  >
+                    {h}
+                  </th>
                 ))}
               </tr>
             </thead>
             <tbody>
               {items.length === 0 && (
                 <tr>
-                  <td className="py-8 text-gray-500" colSpan={7}>
+                  <td className="py-8 text-gray-500" colSpan={8}>
                     ไม่มีข้อมูล — กด “Add” ด้านบนเพื่อเพิ่มแบนเนอร์แรก
                   </td>
                 </tr>
@@ -397,28 +443,41 @@ export default function HeroBanner() {
                 const editing = editingRow === b.rowNumber;
                 return (
                   <tr
-                    key={`${b.rowNumber}-${b.id}`}
-                    className={`border-t ${idx % 2 ? "bg-gray-50/40" : "bg-white"} hover:bg-indigo-50/40 transition`}
+                    key={`${b.rowNumber}-${b.title}`}
+                    className={`border-t ${
+                      idx % 2 ? "bg-gray-50/40" : "bg-white"
+                    } hover:bg-indigo-50/40 transition`}
                   >
                     <td className="py-3 pr-4 align-top">{idx + 1}</td>
+
+                    {/* Image */}
                     <td className="py-3 pr-4 align-top">
                       {editing ? (
                         <div className="flex items-center gap-2">
                           <input
                             className="w-56 rounded-xl border border-gray-300/70 bg-white px-3 py-2 text-sm"
-                            value={editForm.imageUrl}
-                            onChange={(e) => setEditForm({ ...editForm, imageUrl: e.target.value })}
+                            value={editForm.image}
+                            onChange={(e) =>
+                              setEditForm({ ...editForm, image: e.target.value })
+                            }
                           />
                           <div className="h-10 w-10 rounded-md ring-1 ring-gray-200 overflow-hidden bg-gray-50 flex items-center justify-center">
-                            {editForm.imageUrl ? (
-                              <img src={editForm.imageUrl} className="h-full w-full object-cover" />
+                            {editForm.image ? (
+                              <img
+                                src={editForm.image}
+                                className="h-full w-full object-cover"
+                              />
                             ) : (
                               <FiImage className="text-gray-400" />
                             )}
                           </div>
                         </div>
-                      ) : b.imageUrl ? (
-                        <img src={b.imageUrl} alt={b.title} className="h-12 w-12 object-cover rounded-md ring-1 ring-gray-200" />
+                      ) : b.image ? (
+                        <img
+                          src={b.image}
+                          alt={b.title}
+                          className="h-12 w-12 object-cover rounded-md ring-1 ring-gray-200"
+                        />
                       ) : (
                         <div className="h-12 w-12 rounded-md bg-gray-100 flex items-center justify-center text-gray-400 ring-1 ring-gray-200">
                           <FiImage />
@@ -426,78 +485,150 @@ export default function HeroBanner() {
                       )}
                     </td>
 
-                    <td className="py-3 pr-4 align-top font-medium text-gray-800 whitespace-pre-wrap">
+                    {/* Title */}
+                    <td className="py-3 pr-4 align-top font-medium text-gray-800">
                       {editing ? (
                         <input
                           className="w-56 rounded-xl border border-gray-300/70 bg-white px-3 py-2 text-sm"
                           value={editForm.title}
-                          onChange={(e) => setEditForm({ ...editForm, title: e.target.value })}
+                          onChange={(e) =>
+                            setEditForm({ ...editForm, title: e.target.value })
+                          }
                         />
                       ) : (
                         b.title
                       )}
                     </td>
 
-                    <td className="py-3 pr-4 align-top text-gray-700 max-w-[520px]">
+                    {/* Subtitle */}
+                    <td className="py-3 pr-4 align-top">
+                      {editing ? (
+                        <input
+                          className="w-56 rounded-xl border border-gray-300/70 bg-white px-3 py-2 text-sm"
+                          value={editForm.subtitle}
+                          onChange={(e) =>
+                            setEditForm({
+                              ...editForm,
+                              subtitle: e.target.value,
+                            })
+                          }
+                        />
+                      ) : (
+                        b.subtitle
+                      )}
+                    </td>
+
+                    {/* Desc */}
+                    <td className="py-3 pr-4 align-top max-w-[520px]">
                       {editing ? (
                         <textarea
                           rows={3}
                           className="w-full rounded-xl border border-gray-300/70 bg-white px-3 py-2 text-sm"
-                          value={editForm.subtitle}
-                          onChange={(e) => setEditForm({ ...editForm, subtitle: e.target.value })}
+                          value={editForm.desc}
+                          onChange={(e) =>
+                            setEditForm({ ...editForm, desc: e.target.value })
+                          }
                         />
                       ) : (
-                        <div className="line-clamp-3" title={b.subtitle}>
-                          {b.subtitle}
+                        <div className="line-clamp-3" title={b.desc}>
+                          {b.desc}
                         </div>
                       )}
                     </td>
 
+                    {/* Color */}
                     <td className="py-3 pr-4 align-top">
                       {editing ? (
-                        <input
-                          className="w-40 rounded-xl border border-gray-300/70 bg-white px-3 py-2 text-sm"
-                          value={editForm.buttonText}
-                          onChange={(e) => setEditForm({ ...editForm, buttonText: e.target.value })}
-                        />
+                        <div className="flex items-center gap-2">
+                          <input
+                            type="color"
+                            className="h-10 w-12 rounded-md border border-gray-300/70"
+                            value={editForm.color || "#000000"}
+                            onChange={(e) => setEditForm({ ...editForm, color: e.target.value })}
+                          />
+                          <input
+                            className="w-36 rounded-xl border border-gray-300/70 bg-white px-3 py-2 text-sm"
+                            placeholder="#RRGGBB"
+                            value={editForm.color}
+                            onChange={(e) => setEditForm({ ...editForm, color: e.target.value })}
+                          />
+                        </div>
                       ) : (
-                        b.buttonText || "-"
+                        <div className="inline-flex items-center gap-2">
+                          <span
+                            className="h-4 w-6 rounded ring-1 ring-gray-300 inline-block"
+                            style={{ backgroundColor: b.color || "transparent" }}
+                          />
+                          <span>{b.color || "-"}</span>
+                        </div>
                       )}
                     </td>
 
+                    {/* ButtonColor */}
                     <td className="py-3 pr-4 align-top">
                       {editing ? (
-                        <select
-                          className="w-44 rounded-xl border border-gray-300/70 bg-white px-3 py-2 text-sm"
-                          value={editForm.buttonType}
-                          onChange={(e) => setEditForm({ ...editForm, buttonType: e.target.value as ButtonType })}
-                        >
-                          <option value="" disabled>เลือกหมวด</option>
-                          {BTN_TYPES.map((t) => (
-                            <option key={t} value={t}>{t}</option>
-                          ))}
-                        </select>
+                        <div className="flex items-center gap-2">
+                          <input
+                            type="color"
+                            className="h-10 w-12 rounded-md border border-gray-300/70"
+                            value={editForm.buttonColor || "#000000"}
+                            onChange={(e) =>
+                              setEditForm({ ...editForm, buttonColor: e.target.value })
+                            }
+                          />
+                          <input
+                            className="w-36 rounded-xl border border-gray-300/70 bg-white px-3 py-2 text-sm"
+                            placeholder="#RRGGBB"
+                            value={editForm.buttonColor}
+                            onChange={(e) =>
+                              setEditForm({ ...editForm, buttonColor: e.target.value })
+                            }
+                          />
+                        </div>
                       ) : (
-                        b.buttonType || "-"
+                        <div className="inline-flex items-center gap-2">
+                          <span
+                            className="h-4 w-6 rounded ring-1 ring-gray-300 inline-block"
+                            style={{ backgroundColor: b.buttonColor || "transparent" }}
+                          />
+                          <span>{b.buttonColor || "-"}</span>
+                        </div>
                       )}
                     </td>
 
+
+                    {/* Actions */}
                     <td className="py-3 pr-4 align-top">
                       {editing ? (
                         <div className="flex gap-2">
-                          <PillButton variant="primary" onClick={() => saveEdit(b.rowNumber)} disabled={!connected}>
+                          <PillButton
+                            variant="primary"
+                            onClick={() => saveEdit(b.rowNumber)}
+                            disabled={!connected}
+                          >
                             <FiSave /> Save
                           </PillButton>
-                          <PillButton onClick={() => setEditingRow(null)}>
+                          <PillButton
+                            onClick={() => {
+                              setEditingRow(null);
+                            }}
+                          >
                             <FiX /> Cancel
                           </PillButton>
                         </div>
                       ) : (
                         <div className="flex gap-2">
-                          <PillButton onClick={() => startEdit(b)} disabled={!connected}>
+                          <PillButton
+                            onClick={() => startEdit(b)}
+                            disabled={!connected}
+                          >
                             <FiEdit2 /> Edit
                           </PillButton>
-                          <PillButton variant="danger" onClick={() => remove(b.rowNumber)} disabled={!connected}>
+                          <PillButton
+                            variant="danger"
+                            onClick={() => remove(b.rowNumber)}
+                            disabled={!connected}
+                          >
                             <FiTrash2 /> Delete
                           </PillButton>
                         </div>
@@ -514,7 +645,9 @@ export default function HeroBanner() {
       {/* Toast */}
       {toast && (
         <div className="fixed bottom-4 right-4 z-50">
-          <div className="px-4 py-2 rounded-xl bg-black/80 text-white text-sm shadow">{toast}</div>
+          <div className="px-4 py-2 rounded-xl bg-black/80 text-white text-sm shadow">
+            {toast}
+          </div>
         </div>
       )}
     </div>

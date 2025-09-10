@@ -386,46 +386,50 @@ export const deleteProductRow = deleteProduct;
 const TAB_BANNER_HERO =
   (import.meta.env.VITE_SHEET_TAB_BANNERHERO as string) || "BannerHero";
 
+// โครงสร้างข้อมูลของแบนเนอร์ตามชีตใหม่
+// A:No | B:Image | C:Title | D:Subtitle | E:Desc | F:Color | G:ButtonColor | H:Config
 export type BannerRow = {
-  rowNumber: number; // แถวจริงในชีต, ไว้ใช้ update/delete
-  id: string; // A
-  imageUrl: string; // B
-  title: string; // C
-  subtitle: string; // D
-  buttonText: string; // E
-  buttonType: string; // F  (Mens|Womens|Objects)
+  rowNumber: number; // เลขแถวจริง (1-based) สำหรับอัปเดต/ลบ
+  title: string;     // C
+  subtitle: string;  // D
+  desc: string;      // E
+  image: string;     // B
+  color: string;     // F
+  buttonColor: string; // G
 };
 
-// อ่าน Banner ทั้งหมด (A..F)
+// อ่านรายการแบนเนอร์ทั้งหมด (A..H)
 export async function getHeroBanners(
   tab = TAB_BANNER_HERO
 ): Promise<{ header: string[]; items: BannerRow[] }> {
-  const range = `${tab}!A1:F`;
+  const range = `${tab}!A1:H`;
   const url = `https://sheets.googleapis.com/v4/spreadsheets/${SHEET_ID}/values/${encodeURIComponent(
     range
   )}`;
   const res = await fetchWithAuth(url);
   if (!res.ok) throw new Error(await res.text());
+
   const data = (await res.json()) as { values?: string[][] };
   const values = data.values ?? [];
   const [header = [], ...rows] = values;
 
   const items: BannerRow[] = rows
     .map((r, i) => ({
-      rowNumber: i + 2,
-      id: r[0] ?? "",
-      imageUrl: r[1] ?? "",
-      title: r[2] ?? "",
-      subtitle: r[3] ?? "",
-      buttonText: r[4] ?? "",
-      buttonType: r[5] ?? "",
+      rowNumber: i + 2,              // แถวจริง (ข้ามเฮดเดอร์)
+      image: r[1] ?? "",             // B
+      title: r[2] ?? "",             // C
+      subtitle: r[3] ?? "",          // D
+      desc: r[4] ?? "",              // E
+      color: r[5] ?? "",             // F
+      buttonColor: r[6] ?? "",       // G
     }))
-    .filter((x) => x.id || x.imageUrl || x.title);
+    // แสดงเฉพาะแถวที่มีข้อมูลหลัก ๆ อย่างน้อย 1 ช่อง
+    .filter((x) => x.title || x.subtitle || x.image || x.desc);
 
   return { header, items };
 }
 
-// เพิ่ม Banner
+// เพิ่มแถวใหม่ (จะไม่ไปยุ่งคอลัมน์ A:No)
 export async function addHeroBanner(
   b: Omit<BannerRow, "rowNumber">,
   tab = TAB_BANNER_HERO
@@ -434,16 +438,17 @@ export async function addHeroBanner(
     tab
   )}!A1:append?valueInputOption=USER_ENTERED`;
   const body = {
-    values: [
-      [
-        b.id ?? "",
-        b.imageUrl ?? "",
-        b.title ?? "",
-        b.subtitle ?? "",
-        b.buttonText ?? "",
-        b.buttonType ?? "",
-      ],
-    ],
+    // ใส่ "" ไว้ช่อง A (No) ให้คงว่าง/ให้สูตรจัดการเอง
+    values: [[
+      "",                       // A: No
+      b.image ?? "",            // B: Image
+      b.title ?? "",            // C: Title
+      b.subtitle ?? "",         // D: Subtitle
+      b.desc ?? "",             // E: Desc
+      b.color ?? "",            // F: Color
+      b.buttonColor ?? "",      // G: ButtonColor
+      "",                       // H: Config (ไม่แตะตอนเพิ่มแถวข้อมูล)
+    ]],
   };
   const res = await fetchWithAuth(url, {
     method: "POST",
@@ -454,27 +459,26 @@ export async function addHeroBanner(
   return res.json();
 }
 
-// อัปเดต Banner
+// อัปเดตแถวตาม rowNumber (เขียน B..G ตามสคีม่าใหม่)
 export async function updateHeroBanner(
   rowNumber: number,
   b: Omit<BannerRow, "rowNumber">,
   tab = TAB_BANNER_HERO
 ) {
-  const range = `${tab}!A${rowNumber}:F${rowNumber}`;
+  // ยิงเฉพาะช่วง B..G (ไม่ยุ่ง A และ H)
+  const range = `${tab}!B${rowNumber}:G${rowNumber}`;
   const url = `https://sheets.googleapis.com/v4/spreadsheets/${SHEET_ID}/values/${encodeURIComponent(
     range
   )}?valueInputOption=USER_ENTERED`;
   const body = {
-    values: [
-      [
-        b.id ?? "",
-        b.imageUrl ?? "",
-        b.title ?? "",
-        b.subtitle ?? "",
-        b.buttonText ?? "",
-        b.buttonType ?? "",
-      ],
-    ],
+    values: [[
+      b.image ?? "",        // B
+      b.title ?? "",        // C
+      b.subtitle ?? "",     // D
+      b.desc ?? "",         // E
+      b.color ?? "",        // F
+      b.buttonColor ?? "",  // G
+    ]],
   };
   const res = await fetchWithAuth(url, {
     method: "PUT",
@@ -485,9 +489,9 @@ export async function updateHeroBanner(
   return res.json();
 }
 
-// ลบ Banner (ล้างค่าแถว)
+// ลบแถว (ล้าง B..G และคง A/H ไว้)
 export async function deleteHeroBanner(rowNumber: number, tab = TAB_BANNER_HERO) {
-  const range = `${tab}!A${rowNumber}:F${rowNumber}`;
+  const range = `${tab}!B${rowNumber}:G${rowNumber}`;
   const url = `https://sheets.googleapis.com/v4/spreadsheets/${SHEET_ID}/values/${encodeURIComponent(
     range
   )}:clear`;
@@ -500,33 +504,32 @@ export async function deleteHeroBanner(rowNumber: number, tab = TAB_BANNER_HERO)
   return res.json();
 }
 
-// ---- Autoplay interval: เก็บในคอลัมน์ "Config" (คอลัมน์ G) แถว 2 ของแท็บ BannerHero ----
-const HERO_CONFIG_COL = "G";
-const HERO_CONFIG_ROW = 2; // แถวข้อมูล (แถว 1 คือหัวตาราง)
-
-export async function getHeroIntervalMs(): Promise<number> {
-  const range = `${TAB_BANNER_HERO}!${HERO_CONFIG_COL}${HERO_CONFIG_ROW}:${HERO_CONFIG_COL}${HERO_CONFIG_ROW}`;
+// ---- Config: autoplay (ms) ที่คอลัมน์ H2 ----
+export async function getHeroIntervalMs(tab = TAB_BANNER_HERO): Promise<number> {
+  // อ่านเซลล์ H2 เพียงช่องเดียว
+  const range = `${tab}!H2`;
   const url = `https://sheets.googleapis.com/v4/spreadsheets/${SHEET_ID}/values/${encodeURIComponent(
     range
   )}`;
   try {
     const res = await fetchWithAuth(url);
-    if (!res.ok) return 10000; // default
+    if (!res.ok) return 10000;
     const data = (await res.json()) as { values?: string[][] };
-    const v = data.values?.[0]?.[0];
-    const n = Number(v);
-    return Number.isFinite(n) && n > 0 ? n : 10000;
+    const raw = data.values?.[0]?.[0];
+    const ms = Number(raw);
+    return Number.isFinite(ms) ? ms : 10000;
   } catch {
     return 10000;
   }
 }
 
-export async function setHeroIntervalMs(ms: number) {
-  const range = `${TAB_BANNER_HERO}!${HERO_CONFIG_COL}${HERO_CONFIG_ROW}:${HERO_CONFIG_COL}${HERO_CONFIG_ROW}`;
+export async function setHeroIntervalMs(ms: number, tab = TAB_BANNER_HERO) {
+  // เขียนลง H2 อย่างเดียว (ไม่แตะ H1 header)
+  const range = `${tab}!H2`;
   const url = `https://sheets.googleapis.com/v4/spreadsheets/${SHEET_ID}/values/${encodeURIComponent(
     range
   )}?valueInputOption=USER_ENTERED`;
-  const body = { values: [[String(ms)]] }; // เขียนเลขล้วนลง G2
+  const body = { values: [[String(ms)]] };
   const res = await fetchWithAuth(url, {
     method: "PUT",
     headers: { "Content-Type": "application/json" },
