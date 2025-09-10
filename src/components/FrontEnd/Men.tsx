@@ -1,5 +1,5 @@
 import ProductCard from "./ProductCard";
-import { NavLink } from "react-router-dom";
+// import { NavLink } from "react-router-dom";
 
 type P = {
   id: string; name: string; color: string; price: number; image: string; stock: number; 
@@ -28,13 +28,13 @@ export default function Men() {
   return (
 <div className="container mx-auto px-4 py-8">
       {/* Tabs */}
-      <div className="mb-8 flex gap-8 text-sm">
+      {/* <div className="mb-8 flex gap-8 text-sm">
         <NavLink to="/men" className={({isActive}) =>
           `pb-2 ${isActive ? "border-b-2 border-gray-900 text-gray-900" : "text-gray-500 hover:text-gray-900"}`
         }>Mens</NavLink>
         <NavLink to="/women" className="text-gray-500 hover:text-gray-900 pb-2">Womens</NavLink>
         <NavLink to="/objects" className="text-gray-500 hover:text-gray-900 pb-2">Objects</NavLink>
-      </div>
+      </div> */}
 
       {/* Count */}
       <div className="mb-4 text-sm text-gray-600">

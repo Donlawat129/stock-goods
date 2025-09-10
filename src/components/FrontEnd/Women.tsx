@@ -1,4 +1,4 @@
-import { NavLink } from "react-router-dom";
+
 import ProductCard from "./ProductCard";
 import type { Product } from "./ProductCard"; 
 import { useMemo, useState } from "react";
@@ -29,17 +29,8 @@ export default function Women() {
   return (
     <div className="container mx-auto px-4 py-10">
       {/* Tabs */}
-      <div className="mb-8 flex gap-8 text-sm">
-        <NavLink to="/men" className="text-gray-500 hover:text-gray-900 pb-2">Mens</NavLink>
-        <NavLink
-          to="/women"
-          className={({ isActive }) =>
-            `pb-2 ${isActive ? "border-b-2 border-gray-900 text-gray-900" : "text-gray-500 hover:text-gray-900"}`
-          }
-        >
-          Womens
-        </NavLink>
-        <NavLink to="/objects" className="text-gray-500 hover:text-gray-900 pb-2">Objects</NavLink>
+            <div className="mb-4 text-sm text-gray-600">
+        Showing {products.length} products
       </div>
 
       {/* Grid */}
