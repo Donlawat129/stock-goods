@@ -524,17 +524,30 @@ export async function getHeroIntervalMs(tab = TAB_BANNER_HERO): Promise<number> 
 }
 
 export async function setHeroIntervalMs(ms: number, tab = TAB_BANNER_HERO) {
-  // เขียนลง H2 อย่างเดียว (ไม่แตะ H1 header)
-  const range = `${tab}!H2`;
+  // ดึงจำนวน row ปัจจุบันก่อน (เช่น จาก A คอลัมน์ที่มี No)
+  const getUrl = `https://sheets.googleapis.com/v4/spreadsheets/${SHEET_ID}/values/${tab}!A:A`;
+  const getRes = await fetchWithAuth(getUrl);
+  if (!getRes.ok) throw new Error(await getRes.text());
+  const data = await getRes.json();
+  const rowCount = data.values?.length || 1; // นับจำนวนแถวทั้งหมด (รวม header)
+
+  // จะเขียนตั้งแต่ H2 ถึง H{rowCount}
+  const range = `${tab}!H2:H${rowCount}`;
   const url = `https://sheets.googleapis.com/v4/spreadsheets/${SHEET_ID}/values/${encodeURIComponent(
     range
   )}?valueInputOption=USER_ENTERED`;
-  const body = { values: [[String(ms)]] };
+
+  // สร้าง array ยาวตามจำนวน row
+  const values = Array(rowCount - 1).fill([String(ms)]);
+
+  const body = { values };
   const res = await fetchWithAuth(url, {
     method: "PUT",
     headers: { "Content-Type": "application/json" },
     body: JSON.stringify(body),
   });
+
   if (!res.ok) throw new Error(await res.text());
   return res.json();
 }
+
