@@ -1,7 +1,6 @@
 import { useState } from "react";
 import { Link, useNavigate } from "react-router-dom";
 import { login } from "../../lib/auth";
-import { requestSheetsToken } from "../../lib/sheetsClient";
 
 const LoginPage = () => {
   const [email, setEmail] = useState("");
@@ -11,7 +10,6 @@ const LoginPage = () => {
   const handleLogin = async (e: React.FormEvent) => {
     e.preventDefault();
     try {
-      await requestSheetsToken();
       const user = await login(email, password);
       console.log("Logged in:", user);
       navigate("/dashboard");

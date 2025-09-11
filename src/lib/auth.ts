@@ -1,47 +1,80 @@
-// src/lib/auth.ts
-import { readUsers, appendUserRow, findUserByEmailPassword } from "./sheetsClient";
+// src/lib/auth.ts  (Firebase version; drop-in replacement)
+// ไม่พึ่ง Google Sheets อีกต่อไป
 
+import { auth } from "./firebase";
+import {
+  signInWithEmailAndPassword,
+  createUserWithEmailAndPassword,
+  signOut,
+  onAuthStateChanged,
+} from "firebase/auth";
+import type { User } from "firebase/auth";
+
+// ===== Types =====
 export type AuthUser = { uid: string; email: string; name?: string };
 
+// ===== session helpers (เก็บ snapshot เบา ๆ ไว้ใช้กับ UI) =====
 const AUTH_KEY = "auth_user";
 
-// ===== session helpers =====
 export function setSessionUser(u: AuthUser | null) {
   if (u) localStorage.setItem(AUTH_KEY, JSON.stringify(u));
   else localStorage.removeItem(AUTH_KEY);
 }
+
 export function getSessionUser(): AuthUser | null {
   try {
+    // 1) ใช้จาก localStorage ก่อน (เร็วสุด)
     const raw = localStorage.getItem(AUTH_KEY);
-    return raw ? (JSON.parse(raw) as AuthUser) : null;
+    if (raw) return JSON.parse(raw) as AuthUser;
+
+    // 2) ถ้าไม่มี ให้ดึงจาก Firebase currentUser แล้ว cache ไว้
+    const u = auth.currentUser;
+    if (!u) return null;
+    const snapshot = toAuthUser(u);
+    setSessionUser(snapshot);
+    return snapshot;
   } catch {
     return null;
   }
 }
-export function logout() {
+
+// subscribe การเปลี่ยนสถานะผู้ใช้ (ใช้ใน Sidebar/Nav ได้)
+export function onAuthUserChanged(cb: (u: AuthUser | null) => void) {
+  return onAuthStateChanged(auth, (u) => {
+    const snap = u ? toAuthUser(u) : null;
+    setSessionUser(snap);
+    cb(snap);
+  });
+}
+
+export async function logout() {
   setSessionUser(null);
+  await signOut(auth);
 }
 
-// ===== Register (เพิ่ม user ใหม่) =====
+// ===== Register/Login ด้วย Firebase =====
 export async function registerUser(email: string, password: string) {
-  const { rows } = await readUsers();
-  const exists = rows.some((r) => r[1] === email);
-  if (exists) throw new Error("Email already registered");
-
-  const uid = `uid_${Date.now()}_${Math.floor(Math.random() * 1000)}`;
-  await appendUserRow(uid, email, password);
-  return { message: "Register successful. Please login." };
+  const cred = await createUserWithEmailAndPassword(auth, email, password);
+  const u = toAuthUser(cred.user);
+  setSessionUser(u);
+  // ส่งรูปแบบที่ใช้งานได้กว้าง: มีทั้ง message และ user
+  return { message: "Register successful.", user: u };
 }
 
-// ===== Login (บันทึก session ให้ด้วย) =====
 export async function login(email: string, password: string) {
-  const user = await findUserByEmailPassword(email, password);
-  if (!user) throw new Error("Invalid email or password");
+  const cred = await signInWithEmailAndPassword(auth, email, password);
+  const u = toAuthUser(cred.user);
+  setSessionUser(u);
+  return u;
+}
 
-  // ไม่มีคอลัมน์ name ในชีต เลยเดาชื่อจากอีเมลก่อน @
-  const nameGuess = email.split("@")[0];
-  const sessionUser: AuthUser = { uid: user.uid, email: user.email, name: nameGuess };
-
-  setSessionUser(sessionUser); // << เก็บไว้ให้ Sidebar ใช้
-  return sessionUser;
+// ===== Utils =====
+function toAuthUser(u: User): AuthUser {
+  const nameGuess =
+    (u.displayName ?? u.email?.split("@")[0] ?? "").trim() || undefined;
+  return {
+    uid: u.uid,
+    email: u.email ?? "",
+    name: nameGuess,
+  };
 }
