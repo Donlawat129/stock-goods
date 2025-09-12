@@ -4,13 +4,14 @@ import {
   FiPlus, FiEdit, FiTrash, FiLink, FiCloud, FiRefreshCw,
 } from "react-icons/fi";
 import {
+  requestSheetsToken,   // ✅ กลับมาใช้แบบเดิม
+  ensureToken,          // ✅ กลับมาใช้แบบเดิม (silent ตอน mount)
   addProduct,
   getProducts,
   updateProductRow,
   deleteProductRow,
   getNextProductId,
 } from "../../../lib/sheetsClient";
-import { ensureSignedInWithSheetsScope } from "../../../lib/authBootstrap";
 
 // ---------- Types ----------
 export type Category = "Mens" | "Womens" | "Objects";
@@ -61,31 +62,6 @@ export default function ProductManagement() {
     setForm((f) => ({ ...f, id: next }));
   };
 
-  // ===== Auto connect on mount =====
-  useEffect(() => {
-    (async () => {
-      try {
-        await ensureSignedInWithSheetsScope(false);
-        await refresh();
-      } catch (err) {
-        console.error("Auth error:", err);
-      }
-    })();
-  }, []);
-
-  // ===== Actions =====
-  const connectSheets = async () => {
-    try {
-      await ensureSignedInWithSheetsScope(true); // popup consent
-      setConnected(true);
-      await refresh();
-      await assignNewId();
-    } catch (err: unknown) {
-      console.error("connect error:", err);
-      alert((err as any)?.message ?? "เชื่อม Google Sheets ไม่สำเร็จ");
-    }
-  };
-
   const refresh = async () => {
     setLoading(true);
     try {
@@ -106,6 +82,34 @@ export default function ProductManagement() {
       alert((err as any)?.message ?? "โหลดข้อมูลไม่สำเร็จ");
     } finally {
       setLoading(false);
+    }
+  };
+
+  // ===== Auto connect on mount (เหมือนโค้ดเก่า) =====
+  useEffect(() => {
+    (async () => {
+      try {
+        await ensureToken();   // ถ้าเคยอนุญาตแล้วจะผ่านแบบเงียบ
+        setConnected(true);
+        await refresh();
+        await assignNewId();
+      } catch {
+        // ผู้ใช้ใหม่/ไม่มีสิทธิ์ → รอให้กดปุ่ม Connect
+      }
+    })();
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, []);
+
+  // ===== Actions =====
+  const connectSheets = async () => {
+    try {
+      await requestSheetsToken(); // popup consent ครั้งแรก (แบบเดิม)
+      setConnected(true);
+      await refresh();
+      await assignNewId();        // gen เลขให้ทันที
+    } catch (err: unknown) {
+      console.error("connect error:", err);
+      alert((err as any)?.message ?? "เชื่อม Google Sheets ไม่สำเร็จ");
     }
   };
 
@@ -138,7 +142,7 @@ export default function ProductManagement() {
       setEditingRow(null);
       setForm(initForm);
       await refresh();
-      await assignNewId();
+      await assignNewId();  // เตรียมเลขถัดไป
     } catch (err: unknown) {
       console.error("submit error:", err);
       alert((err as any)?.message ?? "บันทึกไม่สำเร็จ");
@@ -169,7 +173,7 @@ export default function ProductManagement() {
     try {
       await deleteProductRow(rowNumber);
       await refresh();
-      if (!isEditing) await assignNewId();
+      if (!isEditing) await assignNewId(); // เผื่อจะเพิ่มชิ้นใหม่ต่อ
     } catch (err: unknown) {
       console.error("delete error:", err);
       alert((err as any)?.message ?? "ลบไม่สำเร็จ");
@@ -220,13 +224,14 @@ export default function ProductManagement() {
       <div className={card}>
         <div className="p-5">
           <form onSubmit={onSubmit} className="grid grid-cols-1 md:grid-cols-7 gap-3">
-            {/* Product ID */}
+            {/* Product ID: readOnly + ปุ่ม New ใช้เลขถัดไปจากชีต */}
             <div className="flex gap-2">
               <input
                 className={input + " flex-1"}
                 placeholder="Product ID (auto)"
                 value={form.id}
                 readOnly
+                title="ระบบจะกำหนดเลขให้อัตโนมัติ"
               />
               <button
                 type="button"
@@ -251,6 +256,7 @@ export default function ProductManagement() {
                 href={form.imageUrl || "#"}
                 target="_blank"
                 rel="noreferrer"
+                title="ดูรูป"
               >
                 <FiLink /> ดูรูป
               </a>
@@ -273,18 +279,24 @@ export default function ProductManagement() {
             </select>
 
             <input
+              type="number"
               className={input}
               placeholder="Price"
               value={form.price}
               onChange={(e) => setForm({ ...form, price: e.target.value })}
+              min="0"
+              step="1"
             />
 
             <input
+              type="number"
               className={input}
               placeholder="Quantity"
               value={form.quantity}
               onChange={(e) => setForm({ ...form, quantity: e.target.value })}
               inputMode="numeric"
+              min="0"
+              step="1"
             />
 
             <textarea
@@ -307,7 +319,7 @@ export default function ProductManagement() {
                   onClick={async () => {
                     setEditingRow(null);
                     setForm(initForm);
-                    await assignNewId();
+                    await assignNewId();   // ออกโหมดแก้ไข → เตรียมเลขใหม่
                   }}
                 >
                   Cancel
