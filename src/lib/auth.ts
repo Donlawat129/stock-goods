@@ -10,8 +10,15 @@ import {
   getRedirectResult,
   setPersistence,
   browserLocalPersistence,
+  type User,
 } from "firebase/auth";
-import type { User } from "firebase/auth";
+
+// ✅ เพิ่ม helpers สำหรับ Google Sheets
+import {
+  requestSheetsToken,
+  addUserRow,
+  userExistsByEmail,
+} from "./sheetsClient";
 
 // ===== Types =====
 export type AuthUser = { uid: string; email: string; name?: string };
@@ -77,9 +84,33 @@ export async function logout() {
 
 // ===== Register/Login Email+Password =====
 export async function registerUser(email: string, password: string) {
+  // 1) สมัครใน Firebase
   const cred = await createUserWithEmailAndPassword(auth, email, password);
   const u = toAuthUser(cred.user);
   setSessionUser(u);
+
+  // 2) บันทึกลง Google Sheets (non-blocking ต่อ UX: ถ้าพลาดจะไม่ล้มการสมัคร)
+  try {
+    // ขอ token (ครั้งแรกจะมี popup)
+    await requestSheetsToken();
+
+    // กันซ้ำอีเมล
+    const exists = await userExistsByEmail(email.trim());
+    if (!exists) {
+      await addUserRow({
+        uid: u.uid,
+        email: u.email,
+        displayName: u.name || "",
+        provider: "password",
+        role: "user",
+        status: "active",
+      });
+    }
+  } catch (e) {
+    // log ไว้เฉย ๆ เพื่อไม่ให้ฟลว์ register ล้ม
+    console.error("[Sheets] append user failed:", e);
+  }
+
   return { message: "Register successful.", user: u };
 }
 
@@ -96,8 +127,9 @@ const googleProvider = new GoogleAuthProvider();
 googleProvider.addScope("openid");
 googleProvider.addScope("email");
 googleProvider.addScope("profile");
-// ✅ เพิ่ม Gmail scope (อ่านอย่างเดียว)
+// (ถ้าไม่ต้องการอ่าน Gmail ให้ลบบรรทัดนี้ออก)
 googleProvider.addScope("https://www.googleapis.com/auth/gmail.readonly");
+
 // ให้ขึ้นเลือกบัญชีทุกครั้ง (กัน cache บัญชี)
 googleProvider.setCustomParameters({ prompt: "select_account" });
 
@@ -114,9 +146,8 @@ export async function handleGoogleRedirect() {
     const u = toAuthUser(result.user);
     setSessionUser(u);
 
-    // ดึง OAuth access token สำหรับ Gmail ออกมาจาก credential
+    // ดึง OAuth access token สำหรับ Gmail ออกมาจาก credential (ถ้าขอ scope ไว้)
     const cred = GoogleAuthProvider.credentialFromResult(result);
-
     const accessToken: string | undefined = cred?.accessToken;
     if (accessToken) {
       setGmailAccessToken(accessToken, 3600);

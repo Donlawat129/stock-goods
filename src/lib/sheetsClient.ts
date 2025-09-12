@@ -13,6 +13,9 @@ const SCOPES = "https://www.googleapis.com/auth/spreadsheets";
 const TOKEN_KEY = "sheets_token";
 const TOKEN_EXP_KEY = "sheets_token_exp"; // epoch ms
 
+// ========== Users ==========
+const TAB_USERS = SHEET_TAB || "Users"; // ใช้ชื่อเดิมที่คุณตั้ง env
+
 // ===== OAuth token (ต้องอยู่ก่อนใช้งานทุกฟังก์ชัน) =====
 let accessToken: string | null = null;
 
@@ -39,6 +42,52 @@ function assertToken() {
   if (!accessToken) accessToken = getStoredToken();
   if (!accessToken) throw new Error("No OAuth token. Call requestSheetsToken() first.");
   return accessToken;
+}
+
+export async function addUserRow(params: {
+  uid: string;
+  email: string;
+  displayName?: string;
+  provider?: string;  // "password" | "google" ฯลฯ
+  role?: string;      // default: "user"
+  status?: string;    // default: "active"
+}) {
+  const nowIso = new Date().toISOString();
+  const url = `https://sheets.googleapis.com/v4/spreadsheets/${SHEET_ID}/values/${encodeURIComponent(
+    `${TAB_USERS}!A1:append`
+  )}?valueInputOption=USER_ENTERED`;
+
+  const body = {
+    values: [[
+      params.uid,                    // A: UID
+      params.email,                  // B: Email
+      params.displayName ?? "",      // C: DisplayName
+      params.provider ?? "password", // D: Provider
+      nowIso,                        // E: CreatedAt (ISO)
+      params.role ?? "user",         // F: Role
+      params.status ?? "active",     // G: Status
+    ]],
+  };
+  const res = await fetchWithAuth(url, {
+    method: "POST",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify(body),
+  });
+  if (!res.ok) throw new Error(await res.text());
+  return res.json();
+}
+
+/** กันซ้ำ: ตรวจว่าอีเมลนี้ถูกบันทึกไว้หรือยัง (อ่านเฉพาะคอลัมน์ B) */
+export async function userExistsByEmail(email: string): Promise<boolean> {
+  const range = `${TAB_USERS}!B2:B`; // ข้าม header
+  const url = `https://sheets.googleapis.com/v4/spreadsheets/${SHEET_ID}/values/${encodeURIComponent(range)}?majorDimension=COLUMNS`;
+  const res = await fetchWithAuth(url);
+  if (!res.ok) return false;
+
+  const data = await res.json();
+  const col: string[] = data?.values?.[0] || [];
+  const needle = email.trim().toLowerCase();
+  return col.some((e) => (e || "").trim().toLowerCase() === needle);
 }
 
 
