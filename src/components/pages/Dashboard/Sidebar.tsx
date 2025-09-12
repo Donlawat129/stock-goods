@@ -39,10 +39,10 @@ const Sidebar = () => {
   const toggleSidebar = () => setIsCollapsed((v) => !v);
   const toggleMobileSidebar = () => setIsMobileOpen((v) => !v);
   const closeMobile = () => setIsMobileOpen(false);
-
+ 
   const onSignOut = () => {
     logout();
-    navigate("/login"); // ปรับ path ตามโปรเจกต์
+    navigate("/login"); 
   };
 
   return (
