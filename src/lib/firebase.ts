@@ -3,7 +3,6 @@ import { getAuth } from "firebase/auth";
 
 
 
-
 const firebaseConfig = {
   apiKey: import.meta.env.VITE_FB_API_KEY,
   authDomain: import.meta.env.VITE_FB_AUTH_DOMAIN,

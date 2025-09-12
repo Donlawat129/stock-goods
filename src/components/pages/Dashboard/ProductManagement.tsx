@@ -4,29 +4,19 @@ import {
   FiPlus, FiEdit, FiTrash, FiLink, FiCloud, FiRefreshCw,
 } from "react-icons/fi";
 import {
-  requestSheetsToken,   // ✅ กลับมาใช้แบบเดิม
-  ensureToken,          // ✅ กลับมาใช้แบบเดิม (silent ตอน mount)
+  requestSheetsToken,
+  ensureToken,
   addProduct,
   getProducts,
   updateProductRow,
   deleteProductRow,
   getNextProductId,
+  type ProductItem, // ✅ ใช้ type จาก sheetsClient
 } from "../../../lib/sheetsClient";
 
 // ---------- Types ----------
 export type Category = "Mens" | "Womens" | "Objects";
 const CATEGORIES: Category[] = ["Mens", "Womens", "Objects"];
-
-export interface ProductItem {
-  rowNumber: number;
-  id: string;
-  imageUrl: string;
-  name: string;
-  category: string;
-  description: string;
-  price: string;
-  quantity: string;
-}
 
 interface ProductForm {
   id: string;
@@ -58,15 +48,15 @@ export default function ProductManagement() {
 
   // ------- helpers -------
   const assignNewId = async () => {
-    const next = await getNextProductId();
-    setForm((f) => ({ ...f, id: next }));
+    const { id: nextId } = await getNextProductId(); // ✅ destructure { id }
+    setForm((f) => ({ ...f, id: nextId }));          // ✅ ตั้งค่าเป็น string
   };
 
   const refresh = async () => {
     setLoading(true);
     try {
-      const { items } = await getProducts();
-      const normalized = (items as any[]).map((r, i) => ({
+      const list = await getProducts(); // ✅ คืน ProductItem[]
+      const normalized: ProductItem[] = (Array.isArray(list) ? list : []).map((r, i) => ({
         rowNumber: r.rowNumber ?? i + 2,
         id: r.id ?? "",
         imageUrl: r.imageUrl ?? "",
@@ -75,7 +65,20 @@ export default function ProductManagement() {
         description: r.description ?? "",
         price: r.price ?? "",
         quantity: r.quantity ?? "",
-      })) as ProductItem[];
+      }));
+
+      // ✅ sort ให้เรียงตามเลข ID 1,2,3… (ตัดตัวอักษรออกก่อนค่อยเทียบตัวเลข)
+      normalized.sort((a, b) => {
+        const na = parseInt(String(a.id).replace(/\D/g, ""), 10);
+        const nb = parseInt(String(b.id).replace(/\D/g, ""), 10);
+        const aOk = !isNaN(na);
+        const bOk = !isNaN(nb);
+        if (aOk && bOk) return na - nb;                     // น้อยก่อน
+        if (aOk) return -1;
+        if (bOk) return 1;
+        return (a.rowNumber || 0) - (b.rowNumber || 0);     // fallback
+      });
+
       setItems(normalized);
     } catch (err: unknown) {
       console.error("refresh error:", err);
@@ -85,16 +88,16 @@ export default function ProductManagement() {
     }
   };
 
-  // ===== Auto connect on mount (เหมือนโค้ดเก่า) =====
+  // ===== Auto connect on mount =====
   useEffect(() => {
     (async () => {
       try {
-        await ensureToken();   // ถ้าเคยอนุญาตแล้วจะผ่านแบบเงียบ
+        await ensureToken();   // stub: true
         setConnected(true);
         await refresh();
         await assignNewId();
       } catch {
-        // ผู้ใช้ใหม่/ไม่มีสิทธิ์ → รอให้กดปุ่ม Connect
+        // รอให้ผู้ใช้กด Connect
       }
     })();
     // eslint-disable-next-line react-hooks/exhaustive-deps
@@ -103,10 +106,10 @@ export default function ProductManagement() {
   // ===== Actions =====
   const connectSheets = async () => {
     try {
-      await requestSheetsToken(); // popup consent ครั้งแรก (แบบเดิม)
+      await requestSheetsToken(); // stub: true
       setConnected(true);
       await refresh();
-      await assignNewId();        // gen เลขให้ทันที
+      await assignNewId();
     } catch (err: unknown) {
       console.error("connect error:", err);
       alert((err as any)?.message ?? "เชื่อม Google Sheets ไม่สำเร็จ");
@@ -121,7 +124,10 @@ export default function ProductManagement() {
     setLoading(true);
     try {
       let idToUse = String(form.id || "").trim();
-      if (!isEditing && !idToUse) idToUse = await getNextProductId();
+      if (!isEditing && !idToUse) {
+        const { id } = await getNextProductId(); // ✅ ใช้ id จากอ็อบเจ็กต์
+        idToUse = id;
+      }
 
       const payload = {
         id: idToUse,
@@ -142,7 +148,7 @@ export default function ProductManagement() {
       setEditingRow(null);
       setForm(initForm);
       await refresh();
-      await assignNewId();  // เตรียมเลขถัดไป
+      await assignNewId();
     } catch (err: unknown) {
       console.error("submit error:", err);
       alert((err as any)?.message ?? "บันทึกไม่สำเร็จ");
@@ -173,7 +179,7 @@ export default function ProductManagement() {
     try {
       await deleteProductRow(rowNumber);
       await refresh();
-      if (!isEditing) await assignNewId(); // เผื่อจะเพิ่มชิ้นใหม่ต่อ
+      if (!isEditing) await assignNewId();
     } catch (err: unknown) {
       console.error("delete error:", err);
       alert((err as any)?.message ?? "ลบไม่สำเร็จ");
@@ -224,7 +230,7 @@ export default function ProductManagement() {
       <div className={card}>
         <div className="p-5">
           <form onSubmit={onSubmit} className="grid grid-cols-1 md:grid-cols-7 gap-3">
-            {/* Product ID: readOnly + ปุ่ม New ใช้เลขถัดไปจากชีต */}
+            {/* Product ID */}
             <div className="flex gap-2">
               <input
                 className={input + " flex-1"}
@@ -319,7 +325,7 @@ export default function ProductManagement() {
                   onClick={async () => {
                     setEditingRow(null);
                     setForm(initForm);
-                    await assignNewId();   // ออกโหมดแก้ไข → เตรียมเลขใหม่
+                    await assignNewId();
                   }}
                 >
                   Cancel
@@ -343,38 +349,39 @@ export default function ProductManagement() {
                 </tr>
               </thead>
               <tbody>
-                {items.map((it, idx) => (
-                  <tr
-                    key={it.rowNumber}
-                    className={`border-t ${idx % 2 ? "bg-gray-50/40" : "bg-white"} hover:bg-indigo-50/40 transition`}
-                  >
-                    <td className="py-2 pr-4 font-mono">{it.id}</td>
-                    <td className="py-2 pr-4">
-                      {it.imageUrl ? (
-                        <img src={it.imageUrl} alt={it.name} className="h-10 w-10 object-cover rounded-md ring-1 ring-gray-200" />
-                      ) : "-"}
-                    </td>
-                    <td className="py-2 pr-4">{it.name}</td>
-                    <td className="py-2 pr-4">{it.category}</td>
-                    <td className="py-2 pr-4 max-w-[480px] truncate" title={it.description}>{it.description}</td>
-                    <td className="py-2 pr-4">{it.price}</td>
-                    <td className="py-2 pr-4">{it.quantity}</td>
-                    <td className="py-2 pr-4">
-                      <div className="flex gap-2">
-                        <button className={actionBtn} onClick={() => onEdit(it.rowNumber, it)}>
-                          <FiEdit /> Edit
-                        </button>
-                        <button className={actionBtn + " text-red-600 hover:bg-red-50"} onClick={() => onDelete(it.rowNumber)}>
-                          <FiTrash /> Delete
-                        </button>
-                      </div>
-                    </td>
-                  </tr>
-                ))}
-                {items.length === 0 && (
+                {items.length === 0 ? (
                   <tr>
                     <td className="py-4 text-gray-500" colSpan={8}>ไม่มีข้อมูล</td>
                   </tr>
+                ) : (
+                  items.map((it, idx) => (
+                    <tr
+                      key={it.rowNumber ?? idx}
+                      className={`border-t ${idx % 2 ? "bg-gray-50/40" : "bg-white"} hover:bg-indigo-50/40 transition`}
+                    >
+                      <td className="py-2 pr-4 font-mono">{it.id}</td>
+                      <td className="py-2 pr-4">
+                        {it.imageUrl ? (
+                          <img src={it.imageUrl} alt={it.name} className="h-10 w-10 object-cover rounded-md ring-1 ring-gray-200" />
+                        ) : "-"}
+                      </td>
+                      <td className="py-2 pr-4">{it.name}</td>
+                      <td className="py-2 pr-4">{it.category}</td>
+                      <td className="py-2 pr-4 max-w-[480px] truncate" title={it.description}>{it.description}</td>
+                      <td className="py-2 pr-4">{it.price}</td>
+                      <td className="py-2 pr-4">{it.quantity}</td>
+                      <td className="py-2 pr-4">
+                        <div className="flex gap-2">
+                          <button className={actionBtn} onClick={() => onEdit(it.rowNumber, it)}>
+                            <FiEdit /> Edit
+                          </button>
+                          <button className={actionBtn + " text-red-600 hover:bg-red-50"} onClick={() => onDelete(it.rowNumber)}>
+                            <FiTrash /> Delete
+                          </button>
+                        </div>
+                      </td>
+                    </tr>
+                  ))
                 )}
               </tbody>
             </table>

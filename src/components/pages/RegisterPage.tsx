@@ -1,7 +1,6 @@
 import { useState } from "react";
 import { Link, useNavigate } from "react-router-dom";
-import { registerUser } from "../../lib/auth"; // ✅ ใช้ registerUser แทน
-import { requestSheetsToken } from "../../lib/sheetsClient";
+import { registerUser } from "../../lib/auth"; // ✅ ใช้ registerUser อย่างเดียวพอ
 
 export default function RegisterPage() {
   const navigate = useNavigate();
@@ -20,11 +19,10 @@ export default function RegisterPage() {
     }
 
     try {
-      await requestSheetsToken();
-      await registerUser(email, password);
+      await registerUser(email, password); // ✅ ไม่ต้องเรียก requestSheetsToken
 
       alert("ลงทะเบียนสำเร็จ! โปรดเข้าสู่ระบบ");
-      navigate("/login"); // ✅ กลับไปหน้า Login
+      navigate("/login");
     } catch (err: any) {
       setError(err.message || "เกิดข้อผิดพลาด");
     }
@@ -87,7 +85,7 @@ export default function RegisterPage() {
         </form>
         <p className="text-sm text-center text-gray-600">
           มีบัญชีอยู่แล้ว?{" "}
-          <Link to="/" className="font-semibold text-blue-600 hover:text-blue-700">
+          <Link to="/login" className="font-semibold text-blue-600 hover:text-blue-700">
             เข้าสู่ระบบที่นี่
           </Link>
         </p>

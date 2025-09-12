@@ -13,14 +13,13 @@ import {
   fetchSignInMethodsForEmail,
   sendPasswordResetEmail,
   EmailAuthProvider,
-  linkWithCredential, 
+  linkWithCredential,
   type User,
 } from "firebase/auth";
 
 import {
   requestSheetsToken,
-  addUserRow,
-  userExistsByEmail,
+  appendUser, // ✅ ใช้ตัวนี้แทน addUserRow/userExistsByEmail
 } from "./sheetsClient";
 
 // ===== Types =====
@@ -95,17 +94,16 @@ export async function registerUser(email: string, password: string) {
   // 2) บันทึกลง Google Sheets (non-blocking)
   try {
     await requestSheetsToken();
-    const exists = await userExistsByEmail(email.trim());
-    if (!exists) {
-      await addUserRow({
-        uid: u.uid,
-        email: u.email,
-        displayName: u.name || "",
-        provider: "password",
-        role: "user",
-        status: "active",
-      });
-    }
+    // โครงสร้างแถว Users: timestamp | uid | email | displayName | provider | role | status
+    await appendUser([
+      new Date().toISOString(),
+      u.uid,
+      u.email,
+      u.name || "",
+      "password",
+      "user",
+      "active",
+    ]);
   } catch (e) {
     console.error("[Sheets] append user failed:", e);
   }
@@ -169,20 +167,18 @@ export async function handleGoogleRedirect() {
       }
     }
 
-    // ✅ บันทึกลงชีตถ้ายังไม่มีแถวของอีเมลนี้
+    // ✅ บันทึกลงชีต (append แถวใหม่)
     try {
       await requestSheetsToken();
-      const exists = await userExistsByEmail(u.email);
-      if (!exists) {
-        await addUserRow({
-          uid: u.uid,
-          email: u.email,
-          displayName: u.name || "",
-          provider: "google",
-          role: "user",
-          status: "active",
-        });
-      }
+      await appendUser([
+        new Date().toISOString(),
+        u.uid,
+        u.email,
+        u.name || "",
+        "google",
+        "user",
+        "active",
+      ]);
     } catch (e) {
       console.error("[Sheets] append user (google) failed:", e);
     }

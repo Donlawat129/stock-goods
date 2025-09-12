@@ -3,18 +3,19 @@
 import { useEffect, useMemo, useState } from "react";
 import { FiPieChart } from "react-icons/fi";
 
-// เชื่อม Google Sheets
+// ✅ เชื่อม Google Sheets ผ่าน GAS proxy (ตามไฟล์ sheetsClient.ts ใหม่)
 import {
   requestSheetsToken,
   getProducts,
+  type ProductItem, // เพื่อให้ TS รู้ชนิดข้อมูลที่ได้กลับมา
 } from "../../../lib/sheetsClient";
 
-// ---------- Types ----------
+// ---------- Types สำหรับ UI ----------
 type ShowcaseProduct = {
   name: string;
-  popularity: number;
-  sales: string;
-  color: string;
+  popularity: number; // 0..100
+  sales: string;      // "45%" แบบสตริง
+  color: string;      // tailwind color class
 };
 
 // ---------- Mini Charts (SVG ไม่มี lib) ----------
@@ -29,13 +30,11 @@ function MiniLineChart({ data, height = 80 }: MiniLineChartProps) {
 
   const pts = data.map((v, i) => {
     const x = (i / (data.length - 1)) * (w - padding * 2) + padding;
-    const y =
-      h - padding - ((v - min) / (max - min)) * (h - padding * 2);
+    const y = h - padding - ((v - min) / (max - min)) * (h - padding * 2);
     return `${x},${y}`;
   });
 
   const area = `M ${padding},${h - padding} L ${pts.join(" ")} L ${w - padding},${h - padding} Z`;
-
 
   return (
     <svg viewBox={`0 0 ${w} ${h}`} className="w-full h-20">
@@ -95,14 +94,7 @@ function DonutChart({ percent, size = 120, label = "Completed" }: DonutChartProp
   return (
     <div className="relative" style={{ width: size, height: size }}>
       <svg width={size} height={size}>
-        <circle
-          cx={size / 2}
-          cy={size / 2}
-          r={r}
-          stroke="#e5e7eb"
-          strokeWidth={stroke}
-          fill="none"
-        />
+        <circle cx={size / 2} cy={size / 2} r={r} stroke="#e5e7eb" strokeWidth={stroke} fill="none" />
         <circle
           cx={size / 2}
           cy={size / 2}
@@ -124,6 +116,12 @@ function DonutChart({ percent, size = 120, label = "Completed" }: DonutChartProp
   );
 }
 
+// ---------- Utils ----------
+const toNumberSafe = (v: string | number | undefined | null, fallback = 0) => {
+  const n = typeof v === "number" ? v : Number(v);
+  return Number.isFinite(n) ? n : fallback;
+};
+
 // ---------- Component ----------
 export default function DashboardContent() {
   // Top products
@@ -131,28 +129,34 @@ export default function DashboardContent() {
 
   // ข้อมูลปลอมสำหรับกราฟ
   const lineData = useMemo(() => [18, 24, 35, 28, 40, 55, 52, 68, 63, 75, 70, 82], []);
-  const barData  = useMemo(() => [72, 55, 88, 60], []);
-  const barLbls  = useMemo(() => ["Q1", "Q2", "Q3", "Q4"], []);
+  const barData = useMemo(() => [72, 55, 88, 60], []);
+  const barLbls = useMemo(() => ["Q1", "Q2", "Q3", "Q4"], []);
   const donutPct = 68;
 
   useEffect(() => {
     (async () => {
       try {
-        await requestSheetsToken("consent");
+        // ✅ เวอร์ชันใหม่ไม่รับ argument
+        await requestSheetsToken();
 
         // ===== Products =====
         try {
-          const prods = await getProducts();
-          // เลือก 4 ตัวแรกทำ Top Products
-          const top = prods.items.slice(0, 4).map((p, i) => ({
-            name: p.name || `Product ${i + 1}`,
-            popularity: Math.max(
-              10,
-              Math.min(95, p.price ? Math.round(Number(p.price)) : 70 - i * 10)
-            ),
-            sales: `${Math.min(45 - i * 5, 45)}%`,
-            color: ["bg-blue-500", "bg-purple-500", "bg-green-500", "bg-amber-500"][i]!,
-          }));
+          const prods: ProductItem[] = await getProducts();
+
+          // เลือก 4 ตัวแรก (หรือเท่าที่มี) ทำ Top Products
+          const top: ShowcaseProduct[] = prods.slice(0, 4).map((p, i) => {
+            const priceNum = toNumberSafe(p.price, 50);
+            const popularity = Math.max(10, Math.min(95, Math.round(priceNum)));
+            const salesPct = Math.min(45 - i * 5, 45);
+
+            return {
+              name: p.name || `Product ${i + 1}`,
+              popularity,
+              sales: `${Math.max(5, salesPct)}%`,
+              color: ["bg-blue-500", "bg-purple-500", "bg-green-500", "bg-amber-500"][i]!,
+            };
+          });
+
           setProducts(top);
         } catch {
           setProducts([]);
@@ -198,25 +202,29 @@ export default function DashboardContent() {
         <h3 className="mb-4 font-semibold text-gray-800 flex items-center">
           <FiPieChart className="mr-2 text-blue-500" /> Top Products
         </h3>
-        <ul className="space-y-4">
-          {products.map((product, index) => (
-            <li key={index} className="flex items-center justify-between">
-              <div className="flex items-center space-x-3 flex-1">
-                <div className={`w-3 h-3 ${product.color} rounded-full`} />
-                <div className="flex-1">
-                  <p className="text-sm font-medium text-gray-700">{product.name}</p>
-                  <div className="w-full h-2 mt-1 bg-gray-200 rounded-full">
-                    <div
-                      className={`h-2 ${product.color} rounded-full`}
-                      style={{ width: `${product.popularity}%` }}
-                    />
+        {products.length === 0 ? (
+          <div className="text-sm text-gray-500">ยังไม่มีข้อมูลสินค้า</div>
+        ) : (
+          <ul className="space-y-4">
+            {products.map((product, index) => (
+              <li key={index} className="flex items-center justify-between">
+                <div className="flex items-center space-x-3 flex-1">
+                  <div className={`w-3 h-3 ${product.color} rounded-full`} />
+                  <div className="flex-1">
+                    <p className="text-sm font-medium text-gray-700">{product.name}</p>
+                    <div className="w-full h-2 mt-1 bg-gray-200 rounded-full">
+                      <div
+                        className={`h-2 ${product.color} rounded-full`}
+                        style={{ width: `${product.popularity}%` }}
+                      />
+                    </div>
                   </div>
                 </div>
-              </div>
-              <span className="text-sm font-medium text-gray-600">{product.sales}</span>
-            </li>
-          ))}
-        </ul>
+                <span className="text-sm font-medium text-gray-600">{product.sales}</span>
+              </li>
+            ))}
+          </ul>
+        )}
       </div>
     </div>
   );
