@@ -36,6 +36,7 @@ function MiniLineChart({ data, height = 80 }: MiniLineChartProps) {
 
   const area = `M ${padding},${h - padding} L ${pts.join(" ")} L ${w - padding},${h - padding} Z`;
 
+
   return (
     <svg viewBox={`0 0 ${w} ${h}`} className="w-full h-20">
       <defs>

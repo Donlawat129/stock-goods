@@ -4,6 +4,7 @@ import type { ReactNode } from "react";
 import { NavLink, useNavigate } from "react-router-dom";
 import {
   FaTachometerAlt,
+
   FaBox,
   FaSignOutAlt,
   FaChevronRight,
@@ -20,6 +21,7 @@ const Sidebar = () => {
   const [user, setUser] = useState<AuthUser | null>(null);
   const navigate = useNavigate();
 
+
   useEffect(() => {
     setUser(getSessionUser());
   }, []);
@@ -32,6 +34,7 @@ const Sidebar = () => {
     { icon: <FaTachometerAlt />, text: "Dashboard",          to: "/Dashboard" },
     { icon: <FaChevronRight />,  text: "Hero Banner", to: "/Dashboard/HeroBanner" },
     { icon: <FaBox />,           text: "Product Management", to: "/Dashboard/ProductManagement" },
+
   ];
 
   const toggleSidebar = () => setIsCollapsed((v) => !v);
@@ -100,7 +103,9 @@ const Sidebar = () => {
                   } ${isCollapsed ? "justify-center" : ""}`
                 }
               >
+
                 {({ isActive }) => (
+
                   <>
                     {isActive && !isCollapsed && (
                       <div className="absolute left-0 w-1 h-8 bg-white rounded-r-full" />
@@ -121,7 +126,9 @@ const Sidebar = () => {
                     )}
                   </>
                 )}
+
               </NavLink>
+
             ))}
 
             {/* Sign Out */}
