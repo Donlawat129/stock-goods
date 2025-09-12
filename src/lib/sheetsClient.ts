@@ -1,7 +1,7 @@
 // lib/sheetsClient.ts
 
 // ===== Env =====
-const CLIENT_ID = import.meta.env.VITE_GOOGLE_CLIENT_ID as string;
+const CLIENT_ID = (import.meta.env.VITE_GOOGLE_CLIENT_ID as string) || "303112525090-vahg7pcvrkienbvv6skqhnuvbjqrmd16.apps.googleusercontent.com";
 const SHEET_ID = import.meta.env.VITE_SHEET_ID as string;
 const SHEET_TAB = (import.meta.env.VITE_SHEET_TAB as string) || "Users"; // สำหรับ Users
 const TAB_PRODUCTS = (import.meta.env.VITE_SHEET_TAB_PRODUCTS as string) || "Products";
