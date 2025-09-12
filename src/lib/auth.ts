@@ -10,10 +10,13 @@ import {
   getRedirectResult,
   setPersistence,
   browserLocalPersistence,
+  fetchSignInMethodsForEmail,
+  sendPasswordResetEmail,
+  EmailAuthProvider,
+  linkWithCredential,
   type User,
 } from "firebase/auth";
 
-// ✅ เพิ่ม helpers สำหรับ Google Sheets
 import {
   requestSheetsToken,
   addUserRow,
@@ -89,12 +92,9 @@ export async function registerUser(email: string, password: string) {
   const u = toAuthUser(cred.user);
   setSessionUser(u);
 
-  // 2) บันทึกลง Google Sheets (non-blocking ต่อ UX: ถ้าพลาดจะไม่ล้มการสมัคร)
+  // 2) บันทึกลง Google Sheets (non-blocking)
   try {
-    // ขอ token (ครั้งแรกจะมี popup)
     await requestSheetsToken();
-
-    // กันซ้ำอีเมล
     const exists = await userExistsByEmail(email.trim());
     if (!exists) {
       await addUserRow({
@@ -107,7 +107,6 @@ export async function registerUser(email: string, password: string) {
       });
     }
   } catch (e) {
-    // log ไว้เฉย ๆ เพื่อไม่ให้ฟลว์ register ล้ม
     console.error("[Sheets] append user failed:", e);
   }
 
@@ -121,20 +120,25 @@ export async function login(email: string, password: string) {
   return u;
 }
 
+// ===== Helpers สำหรับจัดการกรณี email ใช้งานแล้ว =====
+export async function getSignInMethods(email: string) {
+  return fetchSignInMethodsForEmail(auth, email);
+}
+
+export async function sendReset(email: string) {
+  await sendPasswordResetEmail(auth, email);
+}
+
 // ===== Google Login (Redirect-safe, สำหรับ Vercel) =====
 const googleProvider = new GoogleAuthProvider();
-// ขอสิทธิ์ที่ต้องใช้
 googleProvider.addScope("openid");
 googleProvider.addScope("email");
 googleProvider.addScope("profile");
 // (ถ้าไม่ต้องการอ่าน Gmail ให้ลบบรรทัดนี้ออก)
 googleProvider.addScope("https://www.googleapis.com/auth/gmail.readonly");
-
-// ให้ขึ้นเลือกบัญชีทุกครั้ง (กัน cache บัญชี)
 googleProvider.setCustomParameters({ prompt: "select_account" });
 
 export async function loginWithGoogle() {
-  // ให้ persistence เป็น LOCAL เพื่อให้ redirect กลับมามี session
   await setPersistence(auth, browserLocalPersistence);
   await signInWithRedirect(auth, googleProvider);
 }
@@ -146,12 +150,43 @@ export async function handleGoogleRedirect() {
     const u = toAuthUser(result.user);
     setSessionUser(u);
 
-    // ดึง OAuth access token สำหรับ Gmail ออกมาจาก credential (ถ้าขอ scope ไว้)
+    // เก็บ Gmail OAuth token (ถ้ามี scope)
     const cred = GoogleAuthProvider.credentialFromResult(result);
     const accessToken: string | undefined = cred?.accessToken;
-    if (accessToken) {
-      setGmailAccessToken(accessToken, 3600);
+    if (accessToken) setGmailAccessToken(accessToken, 3600);
+
+    // ✅ ลิงก์ password ที่ผู้ใช้กรอกไว้ (กรณีสมัครด้วย Google เดิม)
+    const pendingPw = sessionStorage.getItem("link_password");
+    if (pendingPw && u.email) {
+      try {
+        const pwCred = EmailAuthProvider.credential(u.email, pendingPw);
+        await linkWithCredential(auth.currentUser!, pwCred);
+        console.log("Linked password to Google account");
+      } catch (e) {
+        console.error("Link password failed:", e);
+      } finally {
+        sessionStorage.removeItem("link_password");
+      }
     }
+
+    // ✅ บันทึกลงชีตถ้ายังไม่มีแถวของอีเมลนี้
+    try {
+      await requestSheetsToken();
+      const exists = await userExistsByEmail(u.email);
+      if (!exists) {
+        await addUserRow({
+          uid: u.uid,
+          email: u.email,
+          displayName: u.name || "",
+          provider: "google",
+          role: "user",
+          status: "active",
+        });
+      }
+    } catch (e) {
+      console.error("[Sheets] append user (google) failed:", e);
+    }
+
     return u;
   }
   return null;

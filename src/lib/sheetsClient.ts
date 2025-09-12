@@ -13,11 +13,15 @@ const SCOPES = "https://www.googleapis.com/auth/spreadsheets";
 const TOKEN_KEY = "sheets_token";
 const TOKEN_EXP_KEY = "sheets_token_exp"; // epoch ms
 
+
+
+
 // ========== Users ==========
 const TAB_USERS = SHEET_TAB || "Users"; // ใช้ชื่อเดิมที่คุณตั้ง env
 
 // ===== OAuth token (ต้องอยู่ก่อนใช้งานทุกฟังก์ชัน) =====
 let accessToken: string | null = null;
+
 
 // ---------- Utilities ----------
 const now = () => Date.now();
