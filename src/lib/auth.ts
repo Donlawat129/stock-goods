@@ -1,5 +1,4 @@
-// src/lib/auth.ts  (Firebase version; drop-in replacement)
-// ไม่พึ่ง Google Sheets อีกต่อไป
+// src/lib/auth.ts
 
 import { auth } from "./firebase";
 import {
@@ -7,6 +6,9 @@ import {
   createUserWithEmailAndPassword,
   signOut,
   onAuthStateChanged,
+  GoogleAuthProvider,
+  signInWithRedirect,
+  getRedirectResult,
 } from "firebase/auth";
 import type { User } from "firebase/auth";
 
@@ -23,11 +25,9 @@ export function setSessionUser(u: AuthUser | null) {
 
 export function getSessionUser(): AuthUser | null {
   try {
-    // 1) ใช้จาก localStorage ก่อน (เร็วสุด)
     const raw = localStorage.getItem(AUTH_KEY);
     if (raw) return JSON.parse(raw) as AuthUser;
 
-    // 2) ถ้าไม่มี ให้ดึงจาก Firebase currentUser แล้ว cache ไว้
     const u = auth.currentUser;
     if (!u) return null;
     const snapshot = toAuthUser(u);
@@ -52,12 +52,11 @@ export async function logout() {
   await signOut(auth);
 }
 
-// ===== Register/Login ด้วย Firebase =====
+// ===== Register/Login ด้วย Email+Password =====
 export async function registerUser(email: string, password: string) {
   const cred = await createUserWithEmailAndPassword(auth, email, password);
   const u = toAuthUser(cred.user);
   setSessionUser(u);
-  // ส่งรูปแบบที่ใช้งานได้กว้าง: มีทั้ง message และ user
   return { message: "Register successful.", user: u };
 }
 
@@ -66,6 +65,25 @@ export async function login(email: string, password: string) {
   const u = toAuthUser(cred.user);
   setSessionUser(u);
   return u;
+}
+
+// ===== Google Login (Redirect-safe, เหมาะกับ Vercel) =====
+const googleProvider = new GoogleAuthProvider();
+
+export async function loginWithGoogle() {
+  // Trigger redirect ไปยัง Google
+  await signInWithRedirect(auth, googleProvider);
+}
+
+// เรียกหลัง redirect กลับมา (เช่นใน App.tsx หรือ Layout หลัก)
+export async function handleGoogleRedirect() {
+  const result = await getRedirectResult(auth);
+  if (result?.user) {
+    const u = toAuthUser(result.user);
+    setSessionUser(u);
+    return u;
+  }
+  return null;
 }
 
 // ===== Utils =====

@@ -41,6 +41,7 @@ function assertToken() {
   return accessToken;
 }
 
+
 // โหลด GSI อัตโนมัติถ้ายังไม่มี <script>
 function ensureGisLoaded(): Promise<void> {
   return new Promise((resolve, reject) => {
@@ -550,4 +551,6 @@ export async function setHeroIntervalMs(ms: number, tab = TAB_BANNER_HERO) {
   if (!res.ok) throw new Error(await res.text());
   return res.json();
 }
+
+
 
