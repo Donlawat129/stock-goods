@@ -16,6 +16,14 @@ const LoginPage = () => {
     } catch (err: any) {
       alert(err.message);
     }
+    try {
+  const user = await login(email, password);
+  console.log("Logged in:", user);
+  navigate("/dashboard");
+} catch (err: any) {
+  console.error("Login error:", err); // 👈 log แบบเต็ม ๆ
+  alert(err.code + " : " + err.message);
+}
   };
 
   return (
