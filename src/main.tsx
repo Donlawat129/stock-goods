@@ -11,3 +11,10 @@ createRoot(document.getElementById("root")!).render(
     </Router>
   </StrictMode>
 );
+
+// canonical-domain guard
+const CANON = "log-in-stocking-googlesheet.vercel.app";
+if (location.hostname.endsWith("-godsafe1s-projects.vercel.app")) {
+  const target = `https://${CANON}${location.pathname}${location.search}${location.hash}`;
+  location.replace(target);
+}
