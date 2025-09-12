@@ -22,7 +22,7 @@ export default function RegisterPage() {
       await registerUser(email, password); // ✅ ไม่ต้องเรียก requestSheetsToken
 
       alert("ลงทะเบียนสำเร็จ! โปรดเข้าสู่ระบบ");
-      navigate("/login");
+      navigate("/");
     } catch (err: any) {
       setError(err.message || "เกิดข้อผิดพลาด");
     }
