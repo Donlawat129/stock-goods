@@ -245,18 +245,23 @@ export async function readSheet(tabName?: string) {
 
 // ========== Users ==========
 export async function appendUserRow(uid: string, email: string, password: string) {
+  const range = `${SHEET_TAB}!A1`; // range ที่จะ append
   const url = `https://sheets.googleapis.com/v4/spreadsheets/${SHEET_ID}/values/${encodeURIComponent(
-    SHEET_TAB
-  )}!A1:append?valueInputOption=USER_ENTERED`;
+    range
+  )}:append?valueInputOption=USER_ENTERED`;
+
   const body = { values: [[uid, email, password]] };
+
   const res = await fetchWithAuth(url, {
     method: "POST",
     headers: { "Content-Type": "application/json" },
     body: JSON.stringify(body),
   });
+
   if (!res.ok) throw new Error(await res.text());
   return res.json();
 }
+
 
 export async function readUsers() {
   const range = `${SHEET_TAB}!A1:C`; // uid | email | password
