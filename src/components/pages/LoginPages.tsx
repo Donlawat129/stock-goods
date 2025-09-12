@@ -9,6 +9,7 @@ export default function LoginPage() {
   const navigate = useNavigate();
 
   const handleLogin = async (e: React.FormEvent) => {
+     console.log("CLIENT_ID =", import.meta.env.VITE_GOOGLE_CLIENT_ID);
     e.preventDefault();
     try {
       const user = await login(email, password);
