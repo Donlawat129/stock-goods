@@ -23,6 +23,7 @@ export async function ensureIdentity() {
  * ล็อกอิน Google พร้อมสโคปที่ต้องใช้กับ Google Sheets
  * - ถ้ายังไม่เคยให้สิทธิ์ จะขึ้นหน้าต่าง consent
  * - เก็บ access_token ลง localStorage เพื่อนำไปใส่ Authorization: Bearer <token>
+ * test deploy
  */
 export async function ensureSignedInWithSheetsScope(forceConsent = false) {
   const provider = new GoogleAuthProvider();
