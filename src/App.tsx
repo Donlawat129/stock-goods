@@ -1,5 +1,6 @@
 // App.tsx
-import { Routes, Route, Navigate } from "react-router-dom";
+import { Routes, Route, Navigate, useNavigate } from "react-router-dom";
+import { useEffect } from "react";
 
 import ScrollToTop from "./components/FrontEnd/ScrollToTop";
 // Auth
@@ -24,6 +25,38 @@ import HeroBanner from "./components/pages/Dashboard/HeroBanner";
 import TestAuth from "./components/pages/TestAuth";
 
 export default function App() {
+  const navigate = useNavigate();
+
+  // ✅ ดัก <a href="/..."> ภายในให้ใช้ navigate() ป้องกัน 404
+  useEffect(() => {
+    function onClick(e: MouseEvent) {
+      const a = (e.target as HTMLElement)?.closest?.("a") as HTMLAnchorElement | null;
+      if (!a) return;
+
+      const href = a.getAttribute("href") || "";
+      const sameOrigin = a.origin === window.location.origin;
+      const isAppPath = href.startsWith("/") && !href.startsWith("//");
+      const newTab = a.target && a.target !== "_self";
+      const isDownload = a.hasAttribute("download");
+
+      if (sameOrigin && isAppPath && !isDownload) {
+        e.preventDefault();
+        const url = new URL(a.href);
+        const path = url.pathname + url.search + url.hash;
+
+        if (newTab) {
+          // เปิดแท็บใหม่แบบ hash route
+          window.open(`#${path}`, "_blank", "noopener");
+        } else {
+          navigate(path);
+        }
+      }
+    }
+
+    document.addEventListener("click", onClick);
+    return () => document.removeEventListener("click", onClick);
+  }, [navigate]);
+
   return (
     <>
       <ScrollToTop />
@@ -40,7 +73,7 @@ export default function App() {
         <Route path="/login" element={<LoginPage />} />
         <Route path="/register" element={<RegisterPage />} />
 
-        {/* Dashboard (แนะนำใช้พิมพ์เล็กให้คงที่) */}
+        {/* Dashboard */}
         <Route path="/dashboard" element={<MainLayout />}>
           <Route index element={<Dashboard />} />
           <Route path="ProductManagement" element={<ProductManagement />} />
