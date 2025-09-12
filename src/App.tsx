@@ -2,7 +2,6 @@
 import { Routes, Route, Navigate, useNavigate } from "react-router-dom";
 import { useEffect } from "react";
 
-import ScrollToTop from "./components/FrontEnd/ScrollToTop";
 // Auth
 import LoginPage from "./components/pages/LoginPages";
 import RegisterPage from "./components/pages/RegisterPage";
@@ -53,7 +52,6 @@ export default function App() {
 
   return (
     <>
-      <ScrollToTop />
       <Routes>
 
         {/* Auth */}
