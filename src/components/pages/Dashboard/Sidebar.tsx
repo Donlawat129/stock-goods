@@ -42,7 +42,7 @@ const Sidebar = () => {
  
   const onSignOut = () => {
     logout();
-    navigate("/login"); 
+    navigate("/"); 
   };
 
   return (
