@@ -1,8 +1,9 @@
+// src/pages/Login/LoginPage.tsx
 import { useState } from "react";
 import { Link, useNavigate } from "react-router-dom";
 import { login } from "../../lib/auth";
 
-const LoginPage = () => {
+export default function LoginPage() {
   const [email, setEmail] = useState("");
   const [password, setPassword] = useState("");
   const navigate = useNavigate();
@@ -14,17 +15,13 @@ const LoginPage = () => {
       console.log("Logged in:", user);
       navigate("/dashboard");
     } catch (err: any) {
-      alert(err.message);
+      console.error("Login error:", err);
+      alert((err.code ? `${err.code} : ` : "") + (err.message || "Login failed"));
     }
-    try {
-  const user = await login(email, password);
-  console.log("Logged in:", user);
-  navigate("/dashboard");
-} catch (err: any) {
-  console.error("Login error:", err); // 👈 log แบบเต็ม ๆ
-  alert(err.code + " : " + err.message);
-}
   };
+
+  // debug ชั่วคราว: ดูว่าโหลด CLIENT_ID ได้จริงไหม (ลบออกภายหลัง)
+  console.log("CLIENT_ID =", import.meta.env.VITE_GOOGLE_CLIENT_ID);
 
   return (
     <div className="flex items-center justify-center min-h-screen bg-gray-100">
@@ -71,6 +68,4 @@ const LoginPage = () => {
       </div>
     </div>
   );
-};
-
-export default LoginPage;
+}
