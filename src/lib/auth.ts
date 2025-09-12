@@ -13,7 +13,7 @@ import {
   fetchSignInMethodsForEmail,
   sendPasswordResetEmail,
   EmailAuthProvider,
-  linkWithCredential,
+  linkWithCredential, 
   type User,
 } from "firebase/auth";
 
