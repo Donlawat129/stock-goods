@@ -4,14 +4,13 @@ import {
   FiPlus, FiEdit, FiTrash, FiLink, FiCloud, FiRefreshCw,
 } from "react-icons/fi";
 import {
-  requestSheetsToken,
-  ensureToken,             // <-- เพิ่ม
   addProduct,
   getProducts,
   updateProductRow,
   deleteProductRow,
   getNextProductId,
 } from "../../../lib/sheetsClient";
+import { ensureSignedInWithSheetsScope } from "../../../lib/authBootstrap";
 
 // ---------- Types ----------
 export type Category = "Mens" | "Womens" | "Objects";
@@ -62,28 +61,25 @@ export default function ProductManagement() {
     setForm((f) => ({ ...f, id: next }));
   };
 
-  // ===== Auto connect on mount (silent) =====
+  // ===== Auto connect on mount =====
   useEffect(() => {
     (async () => {
       try {
-        await ensureToken();   // ถ้าเคยอนุญาตแล้วจะผ่านแบบเงียบ
-        setConnected(true);
+        await ensureSignedInWithSheetsScope(false);
         await refresh();
-        await assignNewId();
-      } catch {
-        // ผู้ใช้ใหม่/ไม่มีสิทธิ์ → รอให้กดปุ่ม Connect
+      } catch (err) {
+        console.error("Auth error:", err);
       }
     })();
-    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
 
   // ===== Actions =====
   const connectSheets = async () => {
     try {
-      await requestSheetsToken();
+      await ensureSignedInWithSheetsScope(true); // popup consent
       setConnected(true);
       await refresh();
-      await assignNewId();            // gen เลขให้ทันที
+      await assignNewId();
     } catch (err: unknown) {
       console.error("connect error:", err);
       alert((err as any)?.message ?? "เชื่อม Google Sheets ไม่สำเร็จ");
@@ -120,7 +116,6 @@ export default function ProductManagement() {
 
     setLoading(true);
     try {
-      // ถ้าเป็นการเพิ่ม และ ID ยังว่าง ให้ขอเลขถัดไปอัตโนมัติ
       let idToUse = String(form.id || "").trim();
       if (!isEditing && !idToUse) idToUse = await getNextProductId();
 
@@ -143,7 +138,7 @@ export default function ProductManagement() {
       setEditingRow(null);
       setForm(initForm);
       await refresh();
-      await assignNewId();            // เตรียมเลขถัดไป
+      await assignNewId();
     } catch (err: unknown) {
       console.error("submit error:", err);
       alert((err as any)?.message ?? "บันทึกไม่สำเร็จ");
@@ -174,7 +169,7 @@ export default function ProductManagement() {
     try {
       await deleteProductRow(rowNumber);
       await refresh();
-      if (!isEditing) await assignNewId(); // เผื่อจะเพิ่มชิ้นใหม่ต่อ
+      if (!isEditing) await assignNewId();
     } catch (err: unknown) {
       console.error("delete error:", err);
       alert((err as any)?.message ?? "ลบไม่สำเร็จ");
@@ -225,14 +220,13 @@ export default function ProductManagement() {
       <div className={card}>
         <div className="p-5">
           <form onSubmit={onSubmit} className="grid grid-cols-1 md:grid-cols-7 gap-3">
-            {/* Product ID: readOnly + ปุ่ม New ใช้เลขถัดไปจากชีต */}
+            {/* Product ID */}
             <div className="flex gap-2">
               <input
                 className={input + " flex-1"}
                 placeholder="Product ID (auto)"
                 value={form.id}
                 readOnly
-                title="ระบบจะกำหนดเลขให้อัตโนมัติ"
               />
               <button
                 type="button"
@@ -257,7 +251,6 @@ export default function ProductManagement() {
                 href={form.imageUrl || "#"}
                 target="_blank"
                 rel="noreferrer"
-                title="ดูรูป"
               >
                 <FiLink /> ดูรูป
               </a>
@@ -314,7 +307,7 @@ export default function ProductManagement() {
                   onClick={async () => {
                     setEditingRow(null);
                     setForm(initForm);
-                    await assignNewId();   // ออกโหมดแก้ไข → เตรียมเลขใหม่
+                    await assignNewId();
                   }}
                 >
                   Cancel

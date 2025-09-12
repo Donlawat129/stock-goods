@@ -600,6 +600,3 @@ export async function setHeroIntervalMs(ms: number, tab = TAB_BANNER_HERO) {
   if (!res.ok) throw new Error(await res.text());
   return res.json();
 }
-
-
-
