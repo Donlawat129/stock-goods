@@ -245,10 +245,8 @@ export async function readSheet(tabName?: string) {
 
 // ========== Users ==========
 export async function appendUserRow(uid: string, email: string, password: string) {
-  const range = `${SHEET_TAB}!A1`; // range ที่จะ append
-  const url = `https://sheets.googleapis.com/v4/spreadsheets/${SHEET_ID}/values/${encodeURIComponent(
-    range
-  )}:append?valueInputOption=USER_ENTERED`;
+  const range = `${SHEET_TAB}!A1`; // ชี้หัวตาราง (append จะเลื่อนไปท้ายเอง)
+  const url = `https://sheets.googleapis.com/v4/spreadsheets/${SHEET_ID}/values/${encodeURIComponent(range)}:append?valueInputOption=USER_ENTERED`;
 
   const body = { values: [[uid, email, password]] };
 
@@ -258,7 +256,11 @@ export async function appendUserRow(uid: string, email: string, password: string
     body: JSON.stringify(body),
   });
 
-  if (!res.ok) throw new Error(await res.text());
+  if (!res.ok) {
+    const text = await res.text();
+    console.error("[Sheets] append failed", res.status, text);
+    throw new Error(text);
+  }
   return res.json();
 }
 
