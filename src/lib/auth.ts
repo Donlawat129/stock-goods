@@ -1,5 +1,4 @@
 // src/lib/auth.ts
-
 import { auth } from "./firebase";
 import {
   signInWithEmailAndPassword,
@@ -9,14 +8,18 @@ import {
   GoogleAuthProvider,
   signInWithRedirect,
   getRedirectResult,
+  setPersistence,
+  browserLocalPersistence,
 } from "firebase/auth";
 import type { User } from "firebase/auth";
 
 // ===== Types =====
 export type AuthUser = { uid: string; email: string; name?: string };
 
-// ===== session helpers (เก็บ snapshot เบา ๆ ไว้ใช้กับ UI) =====
+// ===== session helpers =====
 const AUTH_KEY = "auth_user";
+const GMAIL_TOKEN_KEY = "gmail_access_token";
+const GMAIL_TOKEN_EXP_KEY = "gmail_access_token_exp"; // epoch ms
 
 export function setSessionUser(u: AuthUser | null) {
   if (u) localStorage.setItem(AUTH_KEY, JSON.stringify(u));
@@ -38,7 +41,26 @@ export function getSessionUser(): AuthUser | null {
   }
 }
 
-// subscribe การเปลี่ยนสถานะผู้ใช้ (ใช้ใน Sidebar/Nav ได้)
+export function getGmailAccessToken(): string | null {
+  const exp = Number(localStorage.getItem(GMAIL_TOKEN_EXP_KEY) || "0");
+  const now = Date.now();
+  if (!exp || now >= exp) return null; // หมดอายุ
+  return localStorage.getItem(GMAIL_TOKEN_KEY);
+}
+
+function setGmailAccessToken(token: string | null, expiresInSec = 3600) {
+  if (token) {
+    localStorage.setItem(GMAIL_TOKEN_KEY, token);
+    // ใส่ buffer 5 นาที กันเผื่อ
+    const exp = Date.now() + (expiresInSec - 300) * 1000;
+    localStorage.setItem(GMAIL_TOKEN_EXP_KEY, String(exp));
+  } else {
+    localStorage.removeItem(GMAIL_TOKEN_KEY);
+    localStorage.removeItem(GMAIL_TOKEN_EXP_KEY);
+  }
+}
+
+// subscribe การเปลี่ยนสถานะผู้ใช้
 export function onAuthUserChanged(cb: (u: AuthUser | null) => void) {
   return onAuthStateChanged(auth, (u) => {
     const snap = u ? toAuthUser(u) : null;
@@ -49,10 +71,11 @@ export function onAuthUserChanged(cb: (u: AuthUser | null) => void) {
 
 export async function logout() {
   setSessionUser(null);
+  setGmailAccessToken(null);
   await signOut(auth);
 }
 
-// ===== Register/Login ด้วย Email+Password =====
+// ===== Register/Login Email+Password =====
 export async function registerUser(email: string, password: string) {
   const cred = await createUserWithEmailAndPassword(auth, email, password);
   const u = toAuthUser(cred.user);
@@ -67,20 +90,37 @@ export async function login(email: string, password: string) {
   return u;
 }
 
-// ===== Google Login (Redirect-safe, เหมาะกับ Vercel) =====
+// ===== Google Login (Redirect-safe, สำหรับ Vercel) =====
 const googleProvider = new GoogleAuthProvider();
+// ขอสิทธิ์ที่ต้องใช้
+googleProvider.addScope("openid");
+googleProvider.addScope("email");
+googleProvider.addScope("profile");
+// ✅ เพิ่ม Gmail scope (อ่านอย่างเดียว)
+googleProvider.addScope("https://www.googleapis.com/auth/gmail.readonly");
+// ให้ขึ้นเลือกบัญชีทุกครั้ง (กัน cache บัญชี)
+googleProvider.setCustomParameters({ prompt: "select_account" });
 
 export async function loginWithGoogle() {
-  // Trigger redirect ไปยัง Google
+  // ให้ persistence เป็น LOCAL เพื่อให้ redirect กลับมามี session
+  await setPersistence(auth, browserLocalPersistence);
   await signInWithRedirect(auth, googleProvider);
 }
 
-// เรียกหลัง redirect กลับมา (เช่นใน App.tsx หรือ Layout หลัก)
+// เรียกครั้งเดียวหลัง redirect กลับมา (เช่นใน App.tsx useEffect)
 export async function handleGoogleRedirect() {
   const result = await getRedirectResult(auth);
   if (result?.user) {
     const u = toAuthUser(result.user);
     setSessionUser(u);
+
+    // ดึง OAuth access token สำหรับ Gmail ออกมาจาก credential
+    const cred = GoogleAuthProvider.credentialFromResult(result);
+
+    const accessToken: string | undefined = cred?.accessToken;
+    if (accessToken) {
+      setGmailAccessToken(accessToken, 3600);
+    }
     return u;
   }
   return null;
