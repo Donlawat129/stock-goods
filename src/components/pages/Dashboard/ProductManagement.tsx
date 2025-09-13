@@ -1,7 +1,7 @@
 // src/components/pages/Dashboard/ProductManagement.tsx
-import { useEffect, useMemo, useState } from "react";
+import { useEffect, useMemo, useRef, useState } from "react";
 import {
-  FiPlus, FiEdit, FiTrash, FiLink, FiCloud, FiRefreshCw, FiArrowDown, FiSearch,
+  FiPlus, FiEdit, FiTrash, FiLink, FiCloud, FiRefreshCw, FiArrowDown, FiSearch, FiX,
 } from "react-icons/fi";
 import {
   requestSheetsToken,
@@ -53,6 +53,7 @@ export default function ProductManagement() {
   const [sortCategory, setSortCategory] = useState<SortCategory>("All");
   const [showSortMenu, setShowSortMenu] = useState(false);
   const [searchText, setSearchText] = useState("");
+  const searchInputRef = useRef<HTMLInputElement>(null);
 
   // ------- helpers -------
   const assignNewId = async () => {
@@ -231,15 +232,38 @@ export default function ProductManagement() {
         </div>
 
         <div className="flex gap-2 items-center">
-          {/* 🔎 Search (อยู่หน้า Connected) */}
+          {/* 🔎 Search (อยู่หน้า Connected) + ปุ่ม ✕ เคลียร์ */}
           <div className="relative">
             <FiSearch className="absolute left-3 top-1/2 -translate-y-1/2 text-gray-400 pointer-events-none" />
             <input
-              className={input + " pl-9 w-64"}
+              ref={searchInputRef}
+              className={input + " pl-9 pr-8 w-64"}
               placeholder="Search products…"
               value={searchText}
               onChange={(e) => setSearchText(e.target.value)}
+              onKeyDown={(e) => {
+                if (e.key === "Escape" && searchText) {
+                  setSearchText("");
+                  // โฟกัสกลับช่องค้นหา
+                  requestAnimationFrame(() => searchInputRef.current?.focus());
+                }
+              }}
             />
+            {searchText && (
+              <button
+                type="button"
+                className="absolute right-2 top-1/2 -translate-y-1/2 rounded-md px-1 text-gray-400 hover:text-gray-600"
+                onClick={() => {
+                  setSearchText("");
+                  // โฟกัสกลับช่องค้นหา
+                  requestAnimationFrame(() => searchInputRef.current?.focus());
+                }}
+                aria-label="Clear search"
+                title="Clear"
+              >
+                <FiX />
+              </button>
+            )}
           </div>
 
           {!connected && (
