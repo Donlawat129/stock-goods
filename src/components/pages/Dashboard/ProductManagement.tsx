@@ -1,7 +1,7 @@
 // src/components/pages/Dashboard/ProductManagement.tsx
 import { useEffect, useMemo, useState } from "react";
 import {
-  FiPlus, FiEdit, FiTrash, FiLink, FiCloud, FiRefreshCw,
+  FiPlus, FiEdit, FiTrash, FiLink, FiCloud, FiRefreshCw, FiArrowDown,
 } from "react-icons/fi";
 import {
   requestSheetsToken,
@@ -17,6 +17,9 @@ import {
 // ---------- Types ----------
 export type Category = "Mens" | "Womens" | "Objects";
 const CATEGORIES: Category[] = ["Mens", "Womens", "Objects"];
+
+// เพิ่ม All เป็นตัวเลือกพิเศษสำหรับการแสดงผล
+type SortCategory = Category | "All";
 
 interface ProductForm {
   id: string;
@@ -46,16 +49,20 @@ export default function ProductManagement() {
   const [loading, setLoading] = useState(false);
   const isEditing = useMemo(() => editingRow !== null, [editingRow]);
 
+  // ✅ state: เลือกหมวด (หรือ All)
+  const [sortCategory, setSortCategory] = useState<SortCategory>("All");
+  const [showSortMenu, setShowSortMenu] = useState(false);
+
   // ------- helpers -------
   const assignNewId = async () => {
-    const { id: nextId } = await getNextProductId(); // ✅ destructure { id }
-    setForm((f) => ({ ...f, id: nextId }));          // ✅ ตั้งค่าเป็น string
+    const { id: nextId } = await getNextProductId();
+    setForm((f) => ({ ...f, id: nextId }));
   };
 
   const refresh = async () => {
     setLoading(true);
     try {
-      const list = await getProducts(); // ✅ คืน ProductItem[]
+      const list = await getProducts();
       const normalized: ProductItem[] = (Array.isArray(list) ? list : []).map((r, i) => ({
         rowNumber: r.rowNumber ?? i + 2,
         id: r.id ?? "",
@@ -66,19 +73,6 @@ export default function ProductManagement() {
         price: r.price ?? "",
         quantity: r.quantity ?? "",
       }));
-
-      // ✅ sort ให้เรียงตามเลข ID 1,2,3… (ตัดตัวอักษรออกก่อนค่อยเทียบตัวเลข)
-      normalized.sort((a, b) => {
-        const na = parseInt(String(a.id).replace(/\D/g, ""), 10);
-        const nb = parseInt(String(b.id).replace(/\D/g, ""), 10);
-        const aOk = !isNaN(na);
-        const bOk = !isNaN(nb);
-        if (aOk && bOk) return na - nb;                     // น้อยก่อน
-        if (aOk) return -1;
-        if (bOk) return 1;
-        return (a.rowNumber || 0) - (b.rowNumber || 0);     // fallback
-      });
-
       setItems(normalized);
     } catch (err: unknown) {
       console.error("refresh error:", err);
@@ -125,7 +119,7 @@ export default function ProductManagement() {
     try {
       let idToUse = String(form.id || "").trim();
       if (!isEditing && !idToUse) {
-        const { id } = await getNextProductId(); // ✅ ใช้ id จากอ็อบเจ็กต์
+        const { id } = await getNextProductId();
         idToUse = id;
       }
 
@@ -188,6 +182,12 @@ export default function ProductManagement() {
     }
   };
 
+  // ===== View: กรองตาม category หรือ All =====
+  const viewItems = useMemo(() => {
+    if (sortCategory === "All") return items;
+    return items.filter((it) => it.category === sortCategory);
+  }, [items, sortCategory]);
+
   // ===== styles =====
   const card = "bg-white rounded-2xl shadow-sm border border-gray-200/60";
   const input =
@@ -198,6 +198,15 @@ export default function ProductManagement() {
   const primaryBtn =
     "inline-flex items-center gap-2 rounded-2xl bg-gradient-to-r from-indigo-500 to-violet-500 text-white px-4 py-2 text-sm shadow " +
     "hover:opacity-95 disabled:opacity-50";
+
+  const sortMenuWrap = "relative";
+  const sortMenuBtn = actionBtn + " relative";
+  const sortMenuPane =
+    "absolute right-0 mt-1 w-44 rounded-xl border border-gray-200 bg-white shadow-lg overflow-hidden z-10";
+  const sortMenuItem = (active: boolean) =>
+    `w-full text-left px-3 py-2 text-sm flex items-center gap-2 ${
+      active ? "bg-indigo-50 text-indigo-700" : "hover:bg-gray-50"
+    }`;
 
   return (
     <div className="space-y-6">
@@ -219,6 +228,50 @@ export default function ProductManagement() {
               <FiCloud /> Connected
             </span>
           )}
+
+          {/* ✅ ปุ่ม Sort by + เมนูเลือก All/Mens/Womens/Objects (วางก่อน Refresh) */}
+          <div
+            className={sortMenuWrap}
+            tabIndex={0}
+            onBlur={(e) => {
+              if (!e.currentTarget.contains(e.relatedTarget as Node)) {
+                setShowSortMenu(false);
+              }
+            }}
+          >
+            <button
+              className={sortMenuBtn}
+              onClick={() => setShowSortMenu((v) => !v)}
+              aria-haspopup="menu"
+              aria-expanded={showSortMenu}
+              title="Filter by category"
+            >
+              <FiArrowDown className="text-gray-600" />
+              Sort by: {sortCategory}
+            </button>
+
+            {showSortMenu && (
+              <div className={sortMenuPane} role="menu">
+                {(["All", ...CATEGORIES] as SortCategory[]).map((c) => (
+                  <button
+                    key={c}
+                    className={sortMenuItem(sortCategory === c)}
+                    onClick={() => {
+                      setSortCategory(c);
+                      setShowSortMenu(false);
+                    }}
+                    role="menuitem"
+                  >
+                    <span className="inline-block w-4 text-center">
+                      {sortCategory === c ? "✓" : ""}
+                    </span>
+                    {c}
+                  </button>
+                ))}
+              </div>
+            )}
+          </div>
+
           <button className={actionBtn} onClick={refresh} disabled={!connected || loading}>
             <FiRefreshCw className="text-gray-600" />
             Refresh
@@ -349,12 +402,12 @@ export default function ProductManagement() {
                 </tr>
               </thead>
               <tbody>
-                {items.length === 0 ? (
+                {viewItems.length === 0 ? (
                   <tr>
                     <td className="py-4 text-gray-500" colSpan={8}>ไม่มีข้อมูล</td>
                   </tr>
                 ) : (
-                  items.map((it, idx) => (
+                  viewItems.map((it, idx) => (
                     <tr
                       key={it.rowNumber ?? idx}
                       className={`border-t ${idx % 2 ? "bg-gray-50/40" : "bg-white"} hover:bg-indigo-50/40 transition`}
@@ -372,10 +425,10 @@ export default function ProductManagement() {
                       <td className="py-2 pr-4">{it.quantity}</td>
                       <td className="py-2 pr-4">
                         <div className="flex gap-2">
-                          <button className={actionBtn} onClick={() => onEdit(it.rowNumber, it)}>
+                          <button className={actionBtn} onClick={() => onEdit(it.rowNumber!, it)}>
                             <FiEdit /> Edit
                           </button>
-                          <button className={actionBtn + " text-red-600 hover:bg-red-50"} onClick={() => onDelete(it.rowNumber)}>
+                          <button className={actionBtn + " text-red-600 hover:bg-red-50"} onClick={() => onDelete(it.rowNumber!)}>
                             <FiTrash /> Delete
                           </button>
                         </div>
@@ -385,6 +438,10 @@ export default function ProductManagement() {
                 )}
               </tbody>
             </table>
+          </div>
+
+          <div className="pt-3 text-xs text-gray-500">
+            Showing category: <span className="font-medium">{sortCategory}</span>
           </div>
         </div>
       </div>
