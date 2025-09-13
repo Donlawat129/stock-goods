@@ -1,7 +1,7 @@
 // src/components/pages/Dashboard/ProductManagement.tsx
 import { useEffect, useMemo, useState } from "react";
 import {
-  FiPlus, FiEdit, FiTrash, FiLink, FiCloud, FiRefreshCw, FiArrowDown,
+  FiPlus, FiEdit, FiTrash, FiLink, FiCloud, FiRefreshCw, FiArrowDown, FiSearch,
 } from "react-icons/fi";
 import {
   requestSheetsToken,
@@ -49,9 +49,10 @@ export default function ProductManagement() {
   const [loading, setLoading] = useState(false);
   const isEditing = useMemo(() => editingRow !== null, [editingRow]);
 
-  // ✅ state: เลือกหมวด (หรือ All)
+  // ✅ state: เลือกหมวด (หรือ All) + คำค้นหา
   const [sortCategory, setSortCategory] = useState<SortCategory>("All");
   const [showSortMenu, setShowSortMenu] = useState(false);
+  const [searchText, setSearchText] = useState("");
 
   // ------- helpers -------
   const assignNewId = async () => {
@@ -173,7 +174,6 @@ export default function ProductManagement() {
     try {
       await deleteProductRow(rowNumber);
       await refresh();
-      if (!isEditing) await assignNewId();
     } catch (err: unknown) {
       console.error("delete error:", err);
       alert((err as any)?.message ?? "ลบไม่สำเร็จ");
@@ -182,11 +182,25 @@ export default function ProductManagement() {
     }
   };
 
-  // ===== View: กรองตาม category หรือ All =====
+  // ===== View: กรองตาม category (หรือ All) และคำค้นหา =====
   const viewItems = useMemo(() => {
-    if (sortCategory === "All") return items;
-    return items.filter((it) => it.category === sortCategory);
-  }, [items, sortCategory]);
+    const q = searchText.trim().toLowerCase();
+    let list = sortCategory === "All"
+      ? items
+      : items.filter((it) => it.category === sortCategory);
+
+    if (q) {
+      list = list.filter((it) => {
+        const fields = [
+          String(it.id ?? ""),
+          String(it.name ?? ""),
+          String(it.category ?? ""),
+        ].map((s) => s.toLowerCase());
+        return fields.some((f) => f.includes(q));
+      });
+    }
+    return list;
+  }, [items, sortCategory, searchText]);
 
   // ===== styles =====
   const card = "bg-white rounded-2xl shadow-sm border border-gray-200/60";
@@ -216,7 +230,18 @@ export default function ProductManagement() {
           <h1 className="text-3xl font-bold text-gray-800">Product Management</h1>
         </div>
 
-        <div className="flex gap-2">
+        <div className="flex gap-2 items-center">
+          {/* 🔎 Search (อยู่หน้า Connected) */}
+          <div className="relative">
+            <FiSearch className="absolute left-3 top-1/2 -translate-y-1/2 text-gray-400 pointer-events-none" />
+            <input
+              className={input + " pl-9 w-64"}
+              placeholder="Search products…"
+              value={searchText}
+              onChange={(e) => setSearchText(e.target.value)}
+            />
+          </div>
+
           {!connected && (
             <button className={actionBtn} onClick={connectSheets} disabled={connected}>
               <FiCloud className="text-indigo-500" />
@@ -229,7 +254,7 @@ export default function ProductManagement() {
             </span>
           )}
 
-          {/* ✅ ปุ่ม Sort by + เมนูเลือก All/Mens/Womens/Objects (วางก่อน Refresh) */}
+          {/* ✅ Sort by (All/Mens/Womens/Objects) */}
           <div
             className={sortMenuWrap}
             tabIndex={0}
@@ -441,7 +466,10 @@ export default function ProductManagement() {
           </div>
 
           <div className="pt-3 text-xs text-gray-500">
-            Showing category: <span className="font-medium">{sortCategory}</span>
+            Showing: <span className="font-medium">{sortCategory}</span>
+            {searchText.trim() ? (
+              <> · Search: <span className="font-medium">“{searchText}”</span></>
+            ) : null}
           </div>
         </div>
       </div>
