@@ -475,10 +475,10 @@ export default function ProductManagement() {
                       <td className="py-2 pr-4">
                         <div className="flex gap-2">
                           <button className={actionBtn} onClick={() => onEdit(it.rowNumber!, it)}>
-                            <FiEdit /> Edit
+                            <FiEdit /> แก้ไข
                           </button>
                           <button className={actionBtn + " text-red-600 hover:bg-red-50"} onClick={() => onDelete(it.rowNumber!)}>
-                            <FiTrash /> Delete
+                            <FiTrash /> ลบ
                           </button>
                         </div>
                       </td>
