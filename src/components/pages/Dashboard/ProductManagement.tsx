@@ -15,11 +15,11 @@ import {
 } from "../../../lib/sheetsClient";
 
 // ---------- Types ----------
-export type Category = "Mens" | "Womens" | "Objects";
-const CATEGORIES: Category[] = ["Mens", "Womens", "Objects"];
+export type Category = "ผู้ชาย" | "ผู้หญิง" | "เครื่องประดับ";
+const CATEGORIES: Category[] = ["ผู้ชาย", "ผู้หญิง", "เครื่องประดับ"];
 
 // เพิ่ม All เป็นตัวเลือกพิเศษสำหรับการแสดงผล
-type SortCategory = Category | "All";
+type SortCategory = Category | "สินค้าทั้งหมด";
 
 interface ProductForm {
   id: string;
@@ -50,7 +50,7 @@ export default function ProductManagement() {
   const isEditing = useMemo(() => editingRow !== null, [editingRow]);
 
   // ✅ state: เลือกหมวด (หรือ All) + คำค้นหา
-  const [sortCategory, setSortCategory] = useState<SortCategory>("All");
+  const [sortCategory, setSortCategory] = useState<SortCategory>("สินค้าทั้งหมด");
   const [showSortMenu, setShowSortMenu] = useState(false);
   const [searchText, setSearchText] = useState("");
   const searchInputRef = useRef<HTMLInputElement>(null);
@@ -186,7 +186,7 @@ export default function ProductManagement() {
   // ===== View: กรองตาม category (หรือ All) และคำค้นหา =====
   const viewItems = useMemo(() => {
     const q = searchText.trim().toLowerCase();
-    let list = sortCategory === "All"
+    let list = sortCategory === "สินค้าทั้งหมด"
       ? items
       : items.filter((it) => it.category === sortCategory);
 
@@ -238,7 +238,7 @@ export default function ProductManagement() {
             <input
               ref={searchInputRef}
               className={input + " pl-9 pr-8 w-64"}
-              placeholder="Search products…"
+              placeholder="ค้นหาสินค้า…"
               value={searchText}
               onChange={(e) => setSearchText(e.target.value)}
               onKeyDown={(e) => {
@@ -274,7 +274,7 @@ export default function ProductManagement() {
           )}
           {connected && (
             <span className="inline-flex items-center gap-2 rounded-xl border border-green-200 bg-green-50 px-3 py-2 text-sm text-green-700">
-              <FiCloud /> Connected
+              <FiCloud /> กำลังเชื่อมต่อ
             </span>
           )}
 
@@ -296,7 +296,7 @@ export default function ProductManagement() {
               title="Filter by category"
             >
               <FiArrowDown className="text-gray-600" />
-              Sort by: {sortCategory}
+              จัดเรียงตาม: {sortCategory}
             </button>
 
             {showSortMenu && (
@@ -323,7 +323,7 @@ export default function ProductManagement() {
 
           <button className={actionBtn} onClick={refresh} disabled={!connected || loading}>
             <FiRefreshCw className="text-gray-600" />
-            Refresh
+            รีเฟรช
           </button>
         </div>
       </div>
@@ -348,7 +348,7 @@ export default function ProductManagement() {
                 title="ใช้เลขถัดไป"
                 disabled={!connected || loading}
               >
-                <FiRefreshCw /> New
+                <FiRefreshCw /> ลำดับถัดไป
               </button>
             </div>
 
@@ -372,7 +372,7 @@ export default function ProductManagement() {
 
             <input
               className={input}
-              placeholder="Name"
+              placeholder="ชื่อสินค้า"
               value={form.name}
               onChange={(e) => setForm({ ...form, name: e.target.value })}
             />
@@ -382,14 +382,14 @@ export default function ProductManagement() {
               value={form.category}
               onChange={(e) => setForm({ ...form, category: e.target.value as Category })}
             >
-              <option value="" disabled>Category</option>
+              <option value="" disabled>หมวดหมู่สินค้า</option>
               {CATEGORIES.map((c) => (<option key={c} value={c}>{c}</option>))}
             </select>
 
             <input
               type="number"
               className={input}
-              placeholder="Price"
+              placeholder="ราคา"
               value={form.price}
               onChange={(e) => setForm({ ...form, price: e.target.value })}
               min="0"
@@ -399,7 +399,7 @@ export default function ProductManagement() {
             <input
               type="number"
               className={input}
-              placeholder="Quantity"
+              placeholder="จำนวนสินค้า"
               value={form.quantity}
               onChange={(e) => setForm({ ...form, quantity: e.target.value })}
               inputMode="numeric"
@@ -409,7 +409,7 @@ export default function ProductManagement() {
 
             <textarea
               className={input + " md:col-span-7 resize-y"}
-              placeholder="Description"
+              placeholder="คำอธิบายสินค้า"
               rows={4}
               value={form.description}
               onChange={(e) => setForm({ ...form, description: e.target.value })}
@@ -417,7 +417,7 @@ export default function ProductManagement() {
 
             <div className="md:col-span-7 flex gap-2 pt-1">
               <button className={primaryBtn} type="submit" disabled={!connected || loading}>
-                {isEditing ? (<><FiEdit /> Update</>) : (<><FiPlus /> Add</>)}
+                {isEditing ? (<><FiEdit /> อัพเดท</>) : (<><FiPlus /> เพิ่มสินค้า</>)}
               </button>
 
               {isEditing && (
@@ -430,7 +430,7 @@ export default function ProductManagement() {
                     await assignNewId();
                   }}
                 >
-                  Cancel
+                  ยกเลิก
                 </button>
               )}
             </div>
@@ -445,7 +445,7 @@ export default function ProductManagement() {
             <table className="min-w-full text-sm">
               <thead>
                 <tr className="text-left text-gray-600">
-                  {["ID","Image","Name","Category","Description","Price","Quantity",""].map((h) => (
+                  {["ลำดับ","รูปภาพ","ชื่อสินค้า","หมวดหมู่สินค้า","คำอธิบายสินค้า","ราคา","จำนวนสินค้า",""].map((h) => (
                     <th key={h} className="py-2 pr-4 font-medium">{h}</th>
                   ))}
                 </tr>
@@ -490,7 +490,7 @@ export default function ProductManagement() {
           </div>
 
           <div className="pt-3 text-xs text-gray-500">
-            Showing: <span className="font-medium">{sortCategory}</span>
+            กำลังแสดง: <span className="font-medium">{sortCategory}</span>
             {searchText.trim() ? (
               <> · Search: <span className="font-medium">“{searchText}”</span></>
             ) : null}
