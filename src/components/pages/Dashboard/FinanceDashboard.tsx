@@ -402,8 +402,8 @@ export default function FinanceDashboard() {
               value={form.type}
               onChange={(e) => setForm({ ...form, type: e.target.value as "รายรับ" | "รายจ่าย" })}
             >
-              <option value="รายรับ">รายรับ (ขาย)</option>
-              <option value="รายจ่าย">รายจ่าย (ซื้อ)</option>
+              <option value="รายรับ">รายรับ</option>
+              <option value="รายจ่าย">รายจ่าย</option>
             </select>
           </Field>
 
@@ -446,7 +446,7 @@ export default function FinanceDashboard() {
               disabled={saving || !form.productId || !form.quantity}
               className={primaryBtn}
             >
-              <FaPlus /> เพิ่มรายการ
+              <FaPlus /> บันทึกรายการ
             </button>
           </div>
         </div>
@@ -527,7 +527,7 @@ export default function FinanceDashboard() {
       {/* Edit Modal */}
       {editOpen && (
         <div className="fixed inset-0 bg-black/40 flex items-center justify-center z-50">
-          <div className={card + " w-full max-w-3xl"}>
+          <div className={card + " w-full max-w-6xl"}>
             <div className="p-6">
               <h3 className="text-lg font-bold mb-4">แก้ไขรายการ</h3>
 
