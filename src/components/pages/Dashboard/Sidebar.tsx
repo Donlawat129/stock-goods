@@ -10,6 +10,7 @@ import {
   FaChevronRight,
   FaTimes,
   FaBars,
+  FaCoins
 } from "react-icons/fa";
 
 import type { AuthUser } from "../../../lib/auth";
@@ -33,6 +34,7 @@ const Sidebar = () => {
   const navItems: { icon: ReactNode; text: string; to: string }[] = [
     { icon: <FaTachometerAlt />, text: "Dashboard",          to: "/Dashboard" },
     { icon: <FaBox />,           text: "Product Management", to: "/Dashboard/ProductManagement" },
+    { icon: <FaCoins  />,           text: "Finance Dashboard", to: "/Dashboard/FinanceDashboard" },
 
   ];
 

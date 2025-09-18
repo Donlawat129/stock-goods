@@ -14,6 +14,7 @@ import MainLayout from "./components/layouts/Layout";
 // Dashboard pages
 import Dashboard from "./components/pages/Dashboard/Dashboard";
 import ProductManagement from "./components/pages/Dashboard/ProductManagement";
+import FinanceDashboard from "./components/pages/Dashboard/FinanceDashboard";
 
 import TestAuth from "./components/pages/TestAuth";
 
@@ -62,6 +63,7 @@ export default function App() {
         <Route path="/dashboard" element={<MainLayout />}>
           <Route index element={<Dashboard />} />
           <Route path="ProductManagement" element={<ProductManagement />} />
+          <Route path="FinanceDashboard" element={<FinanceDashboard />} />
          
         </Route>
 
