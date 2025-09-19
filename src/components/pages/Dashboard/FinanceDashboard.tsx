@@ -191,6 +191,12 @@ export default function FinanceDashboard() {
     () => filtered.reduce((s, r) => s + sign(r.type) * (r.totalAmount || 0), 0),
     [filtered]
   );
+  // ✅ รวมคงเหลือของรายการที่แสดงอยู่
+  const totalStock = useMemo(
+    () => filtered.reduce((s, r) => s + Number(r.stock || 0), 0),
+    [filtered]
+  );
+
 
   async function onAdd() {
     if (!form.date || !form.productId || !form.quantity) return;
@@ -512,14 +518,26 @@ export default function FinanceDashboard() {
               )}
             </tbody>
             <tfoot>
-              <tr className="bg-gray-50">
-                <td colSpan={7} className="py-2 px-4 text-sm text-gray-600">
-                  กำลังแสดง: {filtered.length} รายการ
-                </td>
-                <td className="py-2 px-4 text-right font-bold">{fmtSigned(grandTotal)}</td>
-                <td colSpan={3}></td>
-              </tr>
-            </tfoot>
+            <tr className="bg-gray-50">
+              {/* ซ้าย: ข้อความสถานะ */}
+              <td colSpan={7} className="py-2 px-4 text-sm text-gray-600">
+                กำลังแสดง: {filtered.length} รายการ
+              </td>
+
+              {/* ใต้คอลัมน์ เป็นเงินรวม */}
+              <td className="py-2 px-4 text-right font-bold">
+                {fmtSigned(grandTotal)}
+              </td>
+
+              {/* ใต้คอลัมน์ สินค้าคงเหลือ */}
+              <td className="py-2 px-4 text-right font-bold">
+                {baht(totalStock)}
+              </td>
+
+              {/* ช่องว่างครอบ “หมายเหตุ” + “จัดการ” */}
+              <td colSpan={2}></td>
+            </tr>
+          </tfoot>
           </table>
         </div>
       </div>
