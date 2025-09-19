@@ -48,6 +48,7 @@ export default function ProductManagement() {
   const [editingRow, setEditingRow] = useState<number | null>(null);
   const [loading, setLoading] = useState(false);
   const isEditing = useMemo(() => editingRow !== null, [editingRow]);
+  
 
   // ✅ state: เลือกหมวด (หรือ All) + คำค้นหา
   const [sortCategory, setSortCategory] = useState<SortCategory>("สินค้าทั้งหมด");
@@ -202,6 +203,12 @@ export default function ProductManagement() {
     }
     return list;
   }, [items, sortCategory, searchText]);
+  // ✅ รวมจำนวนสินค้าของรายการที่แสดง
+  const totalQuantity = useMemo(
+    () => viewItems.reduce((sum, it) => sum + Number(it.quantity || 0), 0),
+    [viewItems]
+  );
+
 
   // ===== styles =====
   const card = "bg-white rounded-2xl shadow-sm border border-gray-200/60";
@@ -488,12 +495,18 @@ export default function ProductManagement() {
               </tbody>
             </table>
           </div>
+          <div className="pt-3 text-xs text-gray-500 flex items-center justify-between">
+            <div>
+              กำลังแสดง: <span className="font-medium">{sortCategory}</span>
+              {searchText.trim() ? (
+                <> · Search: <span className="font-medium">“{searchText}”</span></>
+              ) : null}
+            </div>
 
-          <div className="pt-3 text-xs text-gray-500">
-            กำลังแสดง: <span className="font-medium">{sortCategory}</span>
-            {searchText.trim() ? (
-              <> · Search: <span className="font-medium">“{searchText}”</span></>
-            ) : null}
+            {/* ✅ แสดงผลรวมจำนวนสินค้าทั้งหมด */}
+            <div>
+              จำนวนสินค้ารวม: <span className="font-medium">{totalQuantity}</span>
+            </div>
           </div>
         </div>
       </div>
