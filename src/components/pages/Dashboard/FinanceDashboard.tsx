@@ -38,7 +38,7 @@ function showDate(v: string, mode: "ymd" | "dmy" = "ymd"): string {
 const sign = (type?: string) => (type === "รายรับ" ? 1 : -1);
 const fmtSigned = (n: number) => (n >= 0 ? `฿${baht(n)}` : `-฿${baht(Math.abs(n))}`);
 
-// dropdown view modes
+// dropdown view mode
 type ViewMode = "newest" | "oldest" | "income" | "expense" | "all";
 
 export default function FinanceDashboard() {
