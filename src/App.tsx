@@ -16,8 +16,6 @@ import Dashboard from "./components/pages/Dashboard/Dashboard";
 import ProductManagement from "./components/pages/Dashboard/ProductManagement";
 import FinanceDashboard from "./components/pages/Dashboard/FinanceDashboard";
 
-import TestAuth from "./components/pages/TestAuth";
-
 export default function App() {
   const navigate = useNavigate();
 
@@ -64,10 +62,7 @@ export default function App() {
           <Route index element={<Dashboard />} />
           <Route path="ProductManagement" element={<ProductManagement />} />
           <Route path="FinanceDashboard" element={<FinanceDashboard />} />
-         
         </Route>
-
-        <Route path="/test-auth" element={<TestAuth />} />
 
         {/* not found → dashboard */}
         <Route path="*" element={<Navigate to="/dashboard" replace />} />
