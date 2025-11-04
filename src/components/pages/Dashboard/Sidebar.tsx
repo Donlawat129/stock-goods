@@ -35,18 +35,18 @@ const Sidebar = () => {
     {
       icon: <FaTachometerAlt />,
       text: "Dashboard",
-      to: "/Dashboard",
+      to: "/dashboard",
       roles: ["admin", "owner"], // เฉพาะ admin + owner
     },
     {
       icon: <FaBox />,
       text: "Product Management",
-      to: "/Dashboard/ProductManagement", // ทุก role
+      to: "/dashboard/ProductManagement", // ทุก role
     },
     {
       icon: <FaCoins />,
       text: "Finance Dashboard",
-      to: "/Dashboard/FinanceDashboard",
+      to: "/dashboard/FinanceDashboard",
       roles: ["admin", "owner"], // เฉพาะ admin + owner
     },
   ];
