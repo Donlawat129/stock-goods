@@ -25,6 +25,31 @@ import {
 // ===== Types =====
 export type AuthUser = { uid: string; email: string; name?: string };
 
+// ✅ เพิ่ม type role
+export type UserRole = "guest" | "user" | "admin" | "owner";
+
+// ✅ กำหนดเมลพิเศษ (เปลี่ยนให้เป็นเมลจริงของคุณ)
+const ADMIN_EMAILS = ["admin@yourcompany.com"];
+const OWNER_EMAILS = ["owner@yourcompany.com"];
+
+// ✅ แปลง email → role
+export function getRoleFromEmail(email?: string | null): UserRole {
+  if (!email) return "guest";
+  const e = email.toLowerCase();
+
+  if (OWNER_EMAILS.map((x) => x.toLowerCase()).includes(e)) return "owner";
+  if (ADMIN_EMAILS.map((x) => x.toLowerCase()).includes(e)) return "admin";
+
+  return "user";
+}
+
+// ✅ role สำหรับบันทึกลง Google Sheets (ไม่มี guest)
+function sheetRoleFor(email?: string | null): string {
+  const r = getRoleFromEmail(email);
+  if (r === "guest") return "user";
+  return r;
+}
+
 // ===== session helpers =====
 const AUTH_KEY = "auth_user";
 const GMAIL_TOKEN_KEY = "gmail_access_token";
@@ -101,7 +126,7 @@ export async function registerUser(email: string, password: string) {
       u.email,
       u.name || "",
       "password",
-      "user",
+      sheetRoleFor(u.email), // ✅ เดิมใช้ "user"
       "active",
     ]);
   } catch (e) {
@@ -176,7 +201,7 @@ export async function handleGoogleRedirect() {
         u.email,
         u.name || "",
         "google",
-        "user",
+        sheetRoleFor(u.email), // ✅ เดิมใช้ "user"
         "active",
       ]);
     } catch (e) {
