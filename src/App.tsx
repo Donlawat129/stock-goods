@@ -7,14 +7,18 @@ import LoginPage from "./components/pages/LoginPages";
 import RegisterPage from "./components/pages/RegisterPage";
 
 // Layouts
-
 import MainLayout from "./components/layouts/Layout";
-
 
 // Dashboard pages
 import Dashboard from "./components/pages/Dashboard/Dashboard";
 import ProductManagement from "./components/pages/Dashboard/ProductManagement";
 import FinanceDashboard from "./components/pages/Dashboard/FinanceDashboard";
+
+// ✅ Guards
+import {
+  RequireAuth,
+  RequireAdminOrOwner,
+} from "./components/common/RouteGuards";
 
 export default function App() {
   const navigate = useNavigate();
@@ -22,7 +26,9 @@ export default function App() {
   // ✅ ดัก <a href="/..."> ภายในให้ใช้ navigate() ป้องกัน 404
   useEffect(() => {
     function onClick(e: MouseEvent) {
-      const a = (e.target as HTMLElement)?.closest?.("a") as HTMLAnchorElement | null;
+      const a = (e.target as HTMLElement)?.closest?.(
+        "a"
+      ) as HTMLAnchorElement | null;
       if (!a) return;
 
       const href = a.getAttribute("href") || "";
@@ -52,20 +58,46 @@ export default function App() {
   return (
     <>
       <Routes>
-
         {/* Auth */}
+        {/* หน้า login อยู่ที่ "/" */}
         <Route path="/" element={<LoginPage />} />
         <Route path="/register" element={<RegisterPage />} />
 
-        {/* Dashboard */}
-        <Route path="/dashboard" element={<MainLayout />}>
-          <Route index element={<Dashboard />} />
+        {/* Dashboard ทั้งก้อนต้องล็อกอิน */}
+        <Route
+          path="/dashboard"
+          element={
+            <RequireAuth>
+              <MainLayout />
+            </RequireAuth>
+          }
+        >
+          {/* /dashboard → admin / owner */}
+          <Route
+            index
+            element={
+              <RequireAdminOrOwner>
+                <Dashboard />
+              </RequireAdminOrOwner>
+            }
+          />
+
+          {/* /dashboard/ProductManagement → user ทุกคนที่ล็อกอิน */}
           <Route path="ProductManagement" element={<ProductManagement />} />
-          <Route path="FinanceDashboard" element={<FinanceDashboard />} />
+
+          {/* /dashboard/FinanceDashboard → admin / owner */}
+          <Route
+            path="FinanceDashboard"
+            element={
+              <RequireAdminOrOwner>
+                <FinanceDashboard />
+              </RequireAdminOrOwner>
+            }
+          />
         </Route>
 
-        {/* not found → dashboard */}
-        <Route path="*" element={<Navigate to="/dashboard" replace />} />
+        {/* not found → กลับไปหน้า login */}
+        <Route path="*" element={<Navigate to="/" replace />} />
       </Routes>
     </>
   );
