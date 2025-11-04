@@ -29,8 +29,8 @@ export type AuthUser = { uid: string; email: string; name?: string };
 export type UserRole = "guest" | "user" | "admin" | "owner";
 
 // ✅ กำหนดเมลพิเศษ (เปลี่ยนให้เป็นเมลจริงของคุณ)
-const ADMIN_EMAILS = ["admin@yourcompany.com"];
-const OWNER_EMAILS = ["owner@yourcompany.com"];
+const ADMIN_EMAILS = ["admin@gmail.com"];
+const OWNER_EMAILS = ["owner@gmail.com"];
 
 // ✅ แปลง email → role
 export function getRoleFromEmail(email?: string | null): UserRole {
